@@ -18,13 +18,23 @@ enum PhotoLib {
         return o
     }
 
-    /// 获取相册列表：全部视频 + 用户自建相册（仅含有视频的）
+    /// 获取相册列表：全部视频 + 已隐藏 + 用户自建相册（仅含有视频的）
     static func fetchAlbums() -> [AlbumItem] {
         var result: [AlbumItem] = []
 
         let allCount = PHAsset.fetchAssets(with: .video, options: nil).count
         if allCount > 0 {
             result.append(AlbumItem(title: "全部视频", collection: nil))
+        }
+
+        // 系统「已隐藏」相册，作为独立目录列出
+        let hidden = PHAssetCollection.fetchAssetCollections(
+            with: .smartAlbum, subtype: .smartAlbumHidden, options: nil)
+        hidden.enumerateObjects { col, _, _ in
+            let videos = PHAsset.fetchAssets(in: col, options: videoOptions())
+            if videos.count > 0 {
+                result.append(AlbumItem(title: "已隐藏", collection: col))
+            }
         }
 
         let albums = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: nil)
