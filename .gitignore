@@ -1,0 +1,5 @@
+# XcodeGen 生成的工程文件（云端每次重新生成）
+*.xcodeproj/
+build/
+DerivedData/
+.DS_Store
