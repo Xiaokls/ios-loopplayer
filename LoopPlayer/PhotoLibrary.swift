@@ -2,39 +2,35 @@ import Photos
 import UIKit
 import SwiftUI
 
-/// 相册条目。collection 为 nil 表示伪相册「全部视频」
+/// 相册条目。collection 为 nil 表示伪相册「最近项目」
 struct AlbumItem {
     let title: String
     let collection: PHAssetCollection?
+    /// 已隐藏目录需要包含隐藏资产，其余目录默认排除
+    var includeHidden: Bool = false
 }
 
 enum PhotoLib {
 
     /// 只含视频的筛选选项，按拍摄时间倒序
-    static func videoOptions() -> PHFetchOptions {
+    static func videoOptions(includeHidden: Bool = false) -> PHFetchOptions {
         let o = PHFetchOptions()
-        o.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.video.rawValue)
+        if includeHidden {
+            o.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.video.rawValue)
+        } else {
+            o.predicate = NSPredicate(format: "mediaType = %d AND isHidden = 0", PHAssetMediaType.video.rawValue)
+        }
         o.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         return o
     }
 
-    /// 获取相册列表：全部视频 + 已隐藏 + 用户自建相册（仅含有视频的）
+    /// 获取相册列表：最近项目 + 用户自建相册 + 已隐藏（独立目录，列末）
     static func fetchAlbums() -> [AlbumItem] {
         var result: [AlbumItem] = []
 
-        let allCount = PHAsset.fetchAssets(with: .video, options: nil).count
-        if allCount > 0 {
-            result.append(AlbumItem(title: "全部视频", collection: nil))
-        }
-
-        // 系统「已隐藏」相册，作为独立目录列出
-        let hidden = PHAssetCollection.fetchAssetCollections(
-            with: .smartAlbum, subtype: .smartAlbumHidden, options: nil)
-        hidden.enumerateObjects { col, _, _ in
-            let videos = PHAsset.fetchAssets(in: col, options: videoOptions())
-            if videos.count > 0 {
-                result.append(AlbumItem(title: "已隐藏", collection: col))
-            }
+        let recentsCount = PHAsset.fetchAssets(with: .video, options: videoOptions()).count
+        if recentsCount > 0 {
+            result.append(AlbumItem(title: "最近项目", collection: nil))
         }
 
         let albums = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumRegular, options: nil)
@@ -44,17 +40,28 @@ enum PhotoLib {
                 result.append(AlbumItem(title: col.localizedTitle ?? "未命名", collection: col))
             }
         }
+
+        // 系统「已隐藏」相册，作为独立目录列在末尾
+        let hidden = PHAssetCollection.fetchAssetCollections(
+            with: .smartAlbum, subtype: .smartAlbumHidden, options: nil)
+        hidden.enumerateObjects { col, _, _ in
+            let videos = PHAsset.fetchAssets(in: col, options: videoOptions(includeHidden: true))
+            if videos.count > 0 {
+                result.append(AlbumItem(title: "已隐藏", collection: col, includeHidden: true))
+            }
+        }
         return result
     }
 
     /// 获取某相册内全部视频资源
     static func fetchVideos(in album: AlbumItem) -> [PHAsset] {
         var assets: [PHAsset] = []
+        let options = videoOptions(includeHidden: album.includeHidden)
         let result: PHFetchResult<PHAsset>
         if let col = album.collection {
-            result = PHAsset.fetchAssets(in: col, options: videoOptions())
+            result = PHAsset.fetchAssets(in: col, options: options)
         } else {
-            result = PHAsset.fetchAssets(with: .video, options: videoOptions())
+            result = PHAsset.fetchAssets(with: .video, options: options)
         }
         result.enumerateObjects { asset, _, _ in assets.append(asset) }
         return assets
