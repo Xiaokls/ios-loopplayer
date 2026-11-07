@@ -2,6 +2,9 @@ name: Build IPA
 
 on:
   workflow_dispatch:
+  schedule:
+    # 每天 UTC 20:00 = 北京时间凌晨 4:00，macOS 队列最少
+    - cron: "0 20 * * *"
 
 jobs:
   build:
