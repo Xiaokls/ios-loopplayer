@@ -1,0 +1,31 @@
+workflows:
+  build-ipa:
+    name: Build IPA（免签名，供 TrollStore 安装）
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+    scripts:
+      - name: Install XcodeGen
+        script: |
+          brew install xcodegen
+      - name: Generate Xcode project
+        script: |
+          xcodegen generate
+      - name: Build (unsigned)
+        script: |
+          xcodebuild -project LoopPlayer.xcodeproj \
+            -scheme LoopPlayer \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Package IPA
+        script: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/LoopPlayer.app Payload/
+          zip -qr LoopPlayer.ipa Payload
+    artifacts:
+      - LoopPlayer.ipa
