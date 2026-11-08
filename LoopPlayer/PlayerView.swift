@@ -11,8 +11,6 @@ struct PlayerView: View {
     @State private var hideTimelineTask: DispatchWorkItem?
     /// 竖滑跟手时画面的纵向位移（已乘阻尼系数）
     @State private var dragOffset: CGFloat = 0
-    /// 已越过临界点、正在"吸走"切换动画中
-    @State private var snapping = false
     /// 全屏状态变化回调（宿主控制器据此淡化 Home 小白条）
     var onFullscreenChanged: ((Bool) -> Void)? = nil
     /// 返回按钮回调（宿主控制器直接 dismiss，比 presentationMode 更可靠）
@@ -49,10 +47,8 @@ struct PlayerView: View {
                             let tx = abs(value.translation.width)
                             let ty = value.translation.height
                             if !model.listLoop && abs(ty) > tx {
-                                if snapping { return }
+                                // 拖动中只跟手：画面移动、相邻封面粘着露出，不切换
                                 dragOffset = rubberBand(ty)
-                                // 越过临界点：立即吸走切换，不等松手
-                                if abs(ty) > 60 { snapSwitch(forward: ty < 0) }
                             } else if tx >= abs(ty) {
                                 flashTimeline()
                             }
@@ -60,15 +56,10 @@ struct PlayerView: View {
                         .onEnded { value in
                             let dx = value.translation.width
                             let dy = value.translation.height
-                            if snapping {
-                                // 吸走切换后必须重新起手，防止按住不放连续跳
-                                snapping = false
-                                dragOffset = 0
-                                return
-                            }
                             withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
                             if !model.listLoop && abs(dy) > abs(dx) {
-                                // 未达临界点已弹回，不切换
+                                // 松手时才判定：过阈值切换下一条/上一条，否则弹回
+                                if dy < -60 { model.next() } else if dy > 60 { model.previous() }
                             } else {
                                 model.seekRelative(dx / 10.0)
                                 flashTimeline()
@@ -120,19 +111,6 @@ struct PlayerView: View {
         }
         .edgesIgnoringSafeArea(.all)
         .onDisappear { model.stop() }
-    }
-
-    // MARK: - 越过临界点：画面被吸走并切换下一条
-
-    private func snapSwitch(forward: Bool) {
-        snapping = true
-        let dir: CGFloat = forward ? -1 : 1
-        if forward { model.next() } else { model.previous() }
-        withAnimation(.easeIn(duration: 0.22)) { dragOffset = dir * 160 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
-            dragOffset = 0
-            // snapping 不在此复位：必须等手指抬起（onEnded）才允许下一次切换
-        }
     }
 
     // MARK: - 竖滑橡皮筋阻尼：前 100pt 跟手 1:1，接近 160pt 上限时阻力渐增
