@@ -52,7 +52,7 @@ struct PlayerView: View {
                             let tx = abs(value.translation.width)
                             let ty = value.translation.height
                             if !model.listLoop && abs(ty) > tx {
-                                dragOffset = min(max(ty, -160), 160)   // 1:1 跟手，最大 160pt
+                                dragOffset = rubberBand(ty)
                             } else if tx >= abs(ty) {
                                 flashTimeline()
                             }
@@ -106,6 +106,21 @@ struct PlayerView: View {
         }
         .edgesIgnoringSafeArea(.all)
         .onDisappear { model.stop() }
+    }
+
+    // MARK: - 竖滑橡皮筋阻尼：前 100pt 跟手 1:1，接近 160pt 上限时阻力渐增
+
+    private func rubberBand(_ t: CGFloat) -> CGFloat {
+        let soft: CGFloat = 100
+        let hard: CGFloat = 160
+        let a = abs(t)
+        let o: CGFloat
+        if a <= soft {
+            o = a
+        } else {
+            o = soft + (hard - soft) * (1 - exp(-(a - soft) / (hard - soft)))
+        }
+        return t > 0 ? o : -o
     }
 
     // MARK: - 全屏下滑动时临时显示时间轴，2 秒后自动隐藏
