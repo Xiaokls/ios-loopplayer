@@ -52,7 +52,7 @@ final class PlayerModel: ObservableObject {
 
                 let item = AVPlayerItem(asset: avAsset)
                 if self.listLoop {
-                    self.queue.insert(item, at: 0)
+                    self.queue.insert([item], at: 0)
                     self.endObserver = NotificationCenter.default.addObserver(
                         forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
                     ) { [weak self] _ in
