@@ -1,5 +1,15 @@
 import Photos
 import SwiftUI
+import UIKit
+
+/// 读取窗口真实安全区高度（GeometryReader 在 edgesIgnoringSafeArea 后上报 inset 为 0，不可用）
+enum SafeAreaInsets {
+    private static var window: UIWindow? {
+        UIApplication.shared.windows.first { $0.isKeyWindow }
+    }
+    static var top: CGFloat { window?.safeAreaInsets.top ?? 0 }
+    static var bottom: CGFloat { window?.safeAreaInsets.bottom ?? 0 }
+}
 
 /// 触发播放的请求
 struct PlayRequest: Identifiable {
@@ -21,27 +31,24 @@ struct ContentView: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
 
     var body: some View {
-        GeometryReader { proxy in
-            // 忽略安全区布局，用 inset 手动延伸上下色块到屏幕边缘
-            let top = proxy.safeAreaInsets.top
-            let bottom = proxy.safeAreaInsets.bottom
-            ZStack(alignment: .bottom) {
-                Color(white: 0.08)
+        let top = SafeAreaInsets.top
+        let bottom = SafeAreaInsets.bottom
+        return ZStack(alignment: .bottom) {
+            Color(white: 0.08)
 
-                VStack(spacing: 0) {
-                    header(topInset: top)
-                    grid
-                }
-                .padding(.bottom, 68 + bottom) // 与底部栏完全贴合，不留缝
-
-                bottomBar(bottomInset: bottom)
+            VStack(spacing: 0) {
+                header(topInset: top)
+                grid
             }
-            .background(
-                // 自定义呈现替代 fullScreenCover：全屏时可淡化底部小白条
-                PlayerPresenter(request: $playRequest)
-                    .frame(width: 0, height: 0)
-            )
+            .padding(.bottom, 68 + bottom) // 与底部栏完全贴合，不留缝
+
+            bottomBar(bottomInset: bottom)
         }
+        .background(
+            // 自定义呈现替代 fullScreenCover：全屏时可淡化底部小白条
+            PlayerPresenter(request: $playRequest)
+                .frame(width: 0, height: 0)
+        )
         .edgesIgnoringSafeArea(.all)
         .onAppear(perform: bootstrap)
     }
