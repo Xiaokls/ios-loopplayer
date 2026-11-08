@@ -47,8 +47,12 @@ struct PlayerView: View {
                             let tx = abs(value.translation.width)
                             let ty = value.translation.height
                             if !model.listLoop && abs(ty) > tx {
-                                // 拖动中只跟手：画面移动、相邻封面粘着露出，不切换
-                                dragOffset = rubberBand(ty)
+                                // 该方向有相邻条目才允许拖动；首/尾条对应方向画面锁死不动
+                                let canMove = (ty < 0 && model.adjacent(1) != nil)
+                                    || (ty > 0 && model.adjacent(-1) != nil)
+                                if canMove {
+                                    dragOffset = rubberBand(ty)
+                                }
                             } else if tx >= abs(ty) {
                                 flashTimeline()
                             }
