@@ -17,13 +17,20 @@ struct PlayerView: View {
     var onBack: (() -> Void)? = nil
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color.black.edgesIgnoringSafeArea(.all)
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                Color.black
 
-            VideoSurface(player: model.queue, fill: fullscreen)
-                .edgesIgnoringSafeArea(.all)
-                .offset(y: dragOffset)
-                .contentShape(Rectangle())
+                // 视频与相邻封面拼成一个整体随手指移动，保证边缘严格衔接
+                VStack(spacing: 0) {
+                    if dragOffset > 10, let prev = model.adjacent(-1) {
+                        ThumbView(asset: prev)
+                            .frame(height: min(dragOffset, 160))
+                    }
+
+                    VideoSurface(player: model.queue, fill: fullscreen)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .contentShape(Rectangle())
                 .onTapGesture { model.togglePlay() }
                 .gesture(
                     MagnificationGesture()
@@ -45,7 +52,7 @@ struct PlayerView: View {
                             let tx = abs(value.translation.width)
                             let ty = value.translation.height
                             if !model.listLoop && abs(ty) > tx {
-                                dragOffset = ty * 0.5
+                                dragOffset = min(max(ty * 0.5, -160), 160)
                             } else if tx >= abs(ty) {
                                 flashTimeline()
                             }
@@ -63,25 +70,14 @@ struct PlayerView: View {
                         }
                 )
 
-            // 竖滑跟手时，从边缘露出相邻条目的封面
-            if dragOffset < -10, let next = model.adjacent(1) {
-                VStack(spacing: 0) {
-                    Spacer()
-                    ThumbView(asset: next)
-                        .frame(height: min(-dragOffset, 160))
+                    if dragOffset < -10, let next = model.adjacent(1) {
+                        ThumbView(asset: next)
+                            .frame(height: min(-dragOffset, 160))
+                    }
                 }
-                .edgesIgnoringSafeArea(.bottom)
-            }
-            if dragOffset > 10, let prev = model.adjacent(-1) {
-                VStack(spacing: 0) {
-                    ThumbView(asset: prev)
-                        .frame(height: min(dragOffset, 160))
-                    Spacer()
-                }
-                .edgesIgnoringSafeArea(.top)
-            }
+                .offset(y: dragOffset)
 
-            if !fullscreen {
+                if !fullscreen {
                 header
             }
 
@@ -106,7 +102,9 @@ struct PlayerView: View {
                 .cornerRadius(12)
                 .offset(y: 120)
             }
+            }
         }
+        .edgesIgnoringSafeArea(.all)
         .onDisappear { model.stop() }
     }
 
