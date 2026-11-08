@@ -52,7 +52,7 @@ struct PlayerView: View {
                             let tx = abs(value.translation.width)
                             let ty = value.translation.height
                             if !model.listLoop && abs(ty) > tx {
-                                dragOffset = min(max(ty * 0.5, -160), 160)
+                                dragOffset = min(max(ty, -160), 160)   // 1:1 跟手，最大 160pt
                             } else if tx >= abs(ty) {
                                 flashTimeline()
                             }
