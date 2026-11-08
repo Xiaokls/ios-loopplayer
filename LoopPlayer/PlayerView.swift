@@ -11,6 +11,8 @@ struct PlayerView: View {
     @State private var hideTimelineTask: DispatchWorkItem?
     /// 全屏状态变化回调（宿主控制器据此淡化 Home 小白条）
     var onFullscreenChanged: ((Bool) -> Void)? = nil
+    /// 返回按钮回调（宿主控制器直接 dismiss，比 presentationMode 更可靠）
+    var onBack: (() -> Void)? = nil
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -103,7 +105,13 @@ struct PlayerView: View {
             )
             .frame(height: 90)
 
-            Button(action: { presentation.wrappedValue.dismiss() }) {
+            Button(action: {
+                if let onBack = onBack {
+                    onBack()
+                } else {
+                    presentation.wrappedValue.dismiss()
+                }
+            }) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundColor(.white)
@@ -256,17 +264,21 @@ final class PlayerPresenterVC: UIViewController {
         guard let req = request, currentID != req.id else { return }
         currentID = req.id
         let model = PlayerModel(assets: req.assets, startIndex: req.startIndex, listLoop: req.listLoop)
-        let view = PlayerView(model: model) { [weak self] immersive in
-            self?.hosted?.immersive = immersive
-        }
-        if let host = hosted {
-            host.rootView = view
-            if host.presentingViewController == nil { present(host, animated: true) }
-        } else {
-            let host = PlayerHostingController(rootView: view)
-            host.modalPresentationStyle = .fullScreen
-            hosted = host
-            present(host, animated: true)
-        }
+        let view = PlayerView(
+            model: model,
+            onFullscreenChanged: { [weak self] immersive in
+                self?.hosted?.immersive = immersive
+            },
+            onBack: { [weak self] in
+                guard let self = self else { return }
+                self.currentID = nil
+                self.hosted?.dismiss(animated: true)
+            }
+        )
+        // 每次播放都新建宿主实例，避免复用已 dismiss 的控制器
+        let host = PlayerHostingController(rootView: view)
+        host.modalPresentationStyle = .fullScreen
+        hosted = host
+        present(host, animated: true)
     }
 }
