@@ -19,8 +19,8 @@ targets:
       properties:
         CFBundleDisplayName: loopplayer
         CFBundleName: LoopPlayer
-        CFBundleShortVersionString: "1.0.16"
-        CFBundleVersion: "116"
+        CFBundleShortVersionString: "1.0.17"
+        CFBundleVersion: "117"
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIRequiresFullScreen: true
