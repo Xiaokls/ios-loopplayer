@@ -7,6 +7,8 @@ struct PlayerView: View {
     @Environment(\.presentationMode) private var presentation
     @State private var fullscreen = false
     @State private var pinchValue: CGFloat = 1
+    @State private var timelineVisible = false
+    @State private var hideTimelineTask: DispatchWorkItem?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -28,19 +30,26 @@ struct PlayerView: View {
                             pinchValue = 1
                         }
                 )
-                // 左右滑动调整播放进度：约每 10pt = 1 秒
+                // 左右滑动调整播放进度：约每 10pt = 1 秒；全屏下滑动时临时显示时间轴
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 25)
+                        .onChanged { _ in flashTimeline() }
                         .onEnded { value in
                             model.seekRelative(value.translation.width / 10.0)
+                            flashTimeline()
                         }
                 )
 
-            header
+            if !fullscreen {
+                header
+            }
 
             VStack {
                 Spacer()
-                progressBar
+                if !fullscreen || timelineVisible {
+                    progressBar
+                        .transition(.opacity)
+                }
             }
 
             if model.failed {
@@ -57,6 +66,19 @@ struct PlayerView: View {
                 .offset(y: 120)
             }
         }
+    }
+
+    // MARK: - 全屏下滑动时临时显示时间轴，2 秒后自动隐藏
+
+    private func flashTimeline() {
+        guard fullscreen else { return }
+        withAnimation(.easeInOut(duration: 0.2)) { timelineVisible = true }
+        hideTimelineTask?.cancel()
+        let task = DispatchWorkItem {
+            withAnimation(.easeInOut(duration: 0.3)) { timelineVisible = false }
+        }
+        hideTimelineTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: task)
     }
 
     private var header: some View {
@@ -87,17 +109,20 @@ struct PlayerView: View {
     private var progressBar: some View {
         if model.duration > 0 {
             VStack(spacing: 2) {
-                Slider(
+                SlimSlider(
                     value: Binding(
                         get: { min(model.currentTime, model.duration) },
-                        set: { model.currentTime = $0 }
+                        set: { newValue in
+                            model.isScrubbing = true
+                            model.currentTime = newValue
+                        }
                     ),
-                    in: 0...model.duration,
-                    onEditingChanged: { editing in
-                        if !editing { model.seek(to: model.currentTime) }
+                    range: 0...model.duration,
+                    onCommit: {
+                        model.seek(to: model.currentTime)
+                        model.isScrubbing = false
                     }
                 )
-                .accentColor(.green)
                 HStack {
                     Text(timeString(model.currentTime))
                     Spacer()
@@ -121,6 +146,46 @@ struct PlayerView: View {
     private func timeString(_ seconds: Double) -> String {
         let s = Int(seconds.isFinite ? seconds : 0)
         return String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+/// 细进度条：12pt 圆点 thumb（约为系统 Slider 的一半），拖动即时更新
+struct SlimSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let onCommit: () -> Void
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let span = range.upperBound - range.lowerBound
+            let frac = span > 0 ? (value - range.lowerBound) / span : 0
+            let x = min(max(frac, 0), 1) * width
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(height: 3)
+                Capsule()
+                    .fill(Color.green)
+                    .frame(width: x, height: 3)
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 12, height: 12)
+                    .shadow(color: .black.opacity(0.4), radius: 1)
+                    .offset(x: x - 6)
+            }
+            .frame(height: 24)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { v in
+                        let f = min(max(v.location.x / max(width, 1), 0), 1)
+                        value = range.lowerBound + f * span
+                    }
+                    .onEnded { _ in onCommit() }
+            )
+        }
+        .frame(height: 24)
     }
 }
 

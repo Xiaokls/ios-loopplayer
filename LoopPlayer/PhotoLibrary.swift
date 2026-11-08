@@ -12,11 +12,11 @@ struct AlbumItem {
 
 enum PhotoLib {
 
-    /// 只含视频的筛选选项，按拍摄时间倒序；hiddenOnly=true 时只取隐藏视频
-    static func videoOptions(hiddenOnly: Bool = false) -> PHFetchOptions {
+    /// 只含视频的筛选选项，按拍摄时间倒序；includeHidden=true 时不过滤隐藏资产（用于智能相册集合内取视频）
+    static func videoOptions(includeHidden: Bool = false) -> PHFetchOptions {
         let o = PHFetchOptions()
-        if hiddenOnly {
-            o.predicate = NSPredicate(format: "mediaType = %d AND isHidden = 1", PHAssetMediaType.video.rawValue)
+        if includeHidden {
+            o.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.video.rawValue)
         } else {
             o.predicate = NSPredicate(format: "mediaType = %d AND isHidden = 0", PHAssetMediaType.video.rawValue)
         }
@@ -24,7 +24,7 @@ enum PhotoLib {
         return o
     }
 
-    /// 获取相册列表：最近项目 + 用户自建相册 + 已隐藏（独立目录，列末）
+    /// 获取相册列表：最近项目 + 用户自建相册 + 个人收藏 + 已隐藏（列末）
     static func fetchAlbums() -> [AlbumItem] {
         var result: [AlbumItem] = []
 
@@ -41,15 +41,37 @@ enum PhotoLib {
             }
         }
 
-        // 「已隐藏」独立目录：Photos 框架没有隐藏相册集合，用 isHidden 谓词构造伪相册（始终显示）
-        result.append(AlbumItem(title: "已隐藏", collection: nil, includeHidden: true))
+        // 枚举全部智能相册，按标题识别「个人收藏」「已隐藏」
+        // （公开 SDK 没有 smartAlbumHidden 成员，但隐藏相册确实以智能相册集合形式存在，可直接取其中的资产）
+        var favoritesItem: AlbumItem?
+        var hiddenItem: AlbumItem?
+        let smart = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .any, options: nil)
+        smart.enumerateObjects { col, _, _ in
+            let title = col.localizedTitle ?? ""
+            let isHiddenAlbum = title.contains("隐藏") || title.localizedCaseInsensitiveContains("hidden")
+            let isFavorites = !isHiddenAlbum
+                && (title.contains("收藏") || title.localizedCaseInsensitiveContains("favorit"))
+            guard isHiddenAlbum || isFavorites else { return }
+            let videos = PHAsset.fetchAssets(in: col, options: videoOptions(includeHidden: true))
+            guard videos.count > 0 else { return }
+            let item = AlbumItem(title: title, collection: col, includeHidden: true)
+            if isHiddenAlbum { hiddenItem = item } else { favoritesItem = item }
+        }
+
+        if let fav = favoritesItem { result.append(fav) }
+        if let hid = hiddenItem {
+            result.append(hid)
+        } else {
+            // 兜底：枚举不到隐藏集合时仍常驻显示「已隐藏」（旧 isHidden 谓词伪相册）
+            result.append(AlbumItem(title: "已隐藏", collection: nil, includeHidden: true))
+        }
         return result
     }
 
     /// 获取某相册内全部视频资源
     static func fetchVideos(in album: AlbumItem) -> [PHAsset] {
         var assets: [PHAsset] = []
-        let options = videoOptions(hiddenOnly: album.includeHidden)
+        let options = videoOptions(includeHidden: album.includeHidden)
         let result: PHFetchResult<PHAsset>
         if let col = album.collection {
             result = PHAsset.fetchAssets(in: col, options: options)

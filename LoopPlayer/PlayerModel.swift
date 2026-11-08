@@ -9,6 +9,8 @@ final class PlayerModel: ObservableObject {
     @Published var failed = false
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
+    /// 用户拖动进度条时暂停观察器覆盖 currentTime
+    var isScrubbing = false
 
     let queue = AVQueuePlayer()
 
@@ -24,11 +26,11 @@ final class PlayerModel: ObservableObject {
         self.index = startIndex
         self.listLoop = listLoop
         timeObserver = queue.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
+            forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
             queue: .main
         ) { [weak self] t in
             guard let self = self else { return }
-            self.currentTime = CMTimeGetSeconds(t)
+            if !self.isScrubbing { self.currentTime = CMTimeGetSeconds(t) }
             if let item = self.queue.currentItem {
                 let d = CMTimeGetSeconds(item.duration)
                 if d.isFinite && d > 0 { self.duration = d }
