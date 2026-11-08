@@ -32,13 +32,11 @@ struct ContentView: View {
         }
         .background(Color(white: 0.08))
         .onAppear(perform: bootstrap)
-        .fullScreenCover(item: $playRequest) { req in
-            PlayerView(model: PlayerModel(
-                assets: req.assets,
-                startIndex: req.startIndex,
-                listLoop: req.listLoop
-            ))
-        }
+        .background(
+            // 自定义呈现替代 fullScreenCover：全屏时可淡化底部小白条
+            PlayerPresenter(request: $playRequest)
+                .frame(width: 0, height: 0)
+        )
     }
 
     // MARK: - 头部导航：居中相册下拉菜单

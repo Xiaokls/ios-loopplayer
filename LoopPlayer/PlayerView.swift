@@ -9,6 +9,8 @@ struct PlayerView: View {
     @State private var pinchValue: CGFloat = 1
     @State private var timelineVisible = false
     @State private var hideTimelineTask: DispatchWorkItem?
+    /// 全屏状态变化回调（宿主控制器据此淡化 Home 小白条）
+    var onFullscreenChanged: ((Bool) -> Void)? = nil
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -28,6 +30,7 @@ struct PlayerView: View {
                                 fullscreen = false
                             }
                             pinchValue = 1
+                            onFullscreenChanged?(fullscreen)
                         }
                 )
                 // 横滑=调进度（约每 10pt = 1 秒）；单独播放时竖滑=切换上/下一条（全屏下同样生效）
@@ -220,4 +223,50 @@ struct VideoSurface: UIViewRepresentable {
 final class PlayerUIView: UIView {
     override class var layerClass: AnyClass { AVPlayerLayer.self }
     var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+}
+
+/// 播放页宿主控制器：全屏时声明自动隐藏 Home 小白条（系统会在交互期间淡化，底部上滑仍会唤回）
+final class PlayerHostingController: UIHostingController<PlayerView> {
+    var immersive = false {
+        didSet {
+            if oldValue != immersive { setNeedsUpdateOfHomeIndicatorAutoHidden() }
+        }
+    }
+    override var prefersHomeIndicatorAutoHidden: Bool { immersive }
+}
+
+/// 替代 fullScreenCover：用 PlayerHostingController 呈现播放页，以便控制小白条
+struct PlayerPresenter: UIViewControllerRepresentable {
+    @Binding var request: PlayRequest?
+
+    func makeUIViewController(context: Context) -> PlayerPresenterVC {
+        PlayerPresenterVC()
+    }
+
+    func updateUIViewController(_ uiViewController: PlayerPresenterVC, context: Context) {
+        uiViewController.sync(request: request)
+    }
+}
+
+final class PlayerPresenterVC: UIViewController {
+    private var hosted: PlayerHostingController?
+    private var currentID: UUID?
+
+    func sync(request: PlayRequest?) {
+        guard let req = request, currentID != req.id else { return }
+        currentID = req.id
+        let model = PlayerModel(assets: req.assets, startIndex: req.startIndex, listLoop: req.listLoop)
+        let view = PlayerView(model: model) { [weak self] immersive in
+            self?.hosted?.immersive = immersive
+        }
+        if let host = hosted {
+            host.rootView = view
+            if host.presentingViewController == nil { present(host, animated: true) }
+        } else {
+            let host = PlayerHostingController(rootView: view)
+            host.modalPresentationStyle = .fullScreen
+            hosted = host
+            present(host, animated: true)
+        }
+    }
 }
