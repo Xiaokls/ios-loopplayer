@@ -67,19 +67,19 @@ struct PlayerView: View {
                         }
                 )
 
+                // 相邻条目按整屏页面尺寸紧贴当前页上下缘：
+                // 上滑露出下一页的顶部，下滑露出上一页的底部（与真实翻页一致）
                 if dragOffset < -1, let next = model.adjacent(1) {
-                    let h = min(-dragOffset, peekMax)
                     ThumbView(asset: next)
-                        .frame(width: geo.size.width, height: h)
+                        .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
-                        .position(x: geo.size.width / 2, y: geo.size.height + dragOffset + h / 2)
+                        .position(x: geo.size.width / 2, y: geo.size.height * 1.5 + dragOffset)
                 }
                 if dragOffset > 1, let prev = model.adjacent(-1) {
-                    let h = min(dragOffset, peekMax)
                     ThumbView(asset: prev)
-                        .frame(width: geo.size.width, height: h)
+                        .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
-                        .position(x: geo.size.width / 2, y: dragOffset - h / 2)
+                        .position(x: geo.size.width / 2, y: dragOffset - geo.size.height / 2)
                 }
 
                 if !fullscreen {
