@@ -64,7 +64,7 @@ struct PlayerView: View {
             .padding(.leading, 8)
             .padding(.top, 2)
         }
-        .ignoresSafeArea(edges: .top)
+        .edgesIgnoringSafeArea(.top)
     }
 }
 
