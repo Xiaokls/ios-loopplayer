@@ -86,10 +86,10 @@ struct PlayerView: View {
 
                 // 相邻条目按整屏页面尺寸紧贴当前页上下缘：
                 // 上滑露出下一页的顶部，下滑露出上一页的底部（与真实翻页一致）。
-                // 拖动中把相邻页向画面吸 20pt（30pt 信箱黑条恒定显示 10pt），全程不随深度衰减
+                // 拖动中把相邻页向画面吸 25pt（30pt 信箱黑条恒定只露 5pt 间距），松手恢复
                 if dragOffset < -1, let next = model.adjacent(1) {
                     let H = geo.size.height
-                    let pull = min(CGFloat(20), -dragOffset)
+                    let pull = min(CGFloat(25), -dragOffset)
                     ThumbView(asset: next)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
@@ -97,7 +97,7 @@ struct PlayerView: View {
                 }
                 if dragOffset > 1, let prev = model.adjacent(-1) {
                     let H = geo.size.height
-                    let pull = min(CGFloat(20), dragOffset)
+                    let pull = min(CGFloat(25), dragOffset)
                     ThumbView(asset: prev)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
