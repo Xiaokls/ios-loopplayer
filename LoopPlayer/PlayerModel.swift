@@ -175,14 +175,18 @@ final class PlayerModel: ObservableObject {
 
     private func switchRelative(_ delta: Int) {
         guard !listLoop, !stopped, assets.count > 1 else { return }
-        index = (index + delta + assets.count) % assets.count
+        let i = index + delta
+        guard i >= 0, i < assets.count else { return }  // 首尾不循环
+        index = i
         loadCurrent()
     }
 
-    /// 单独播放模式下相邻条目的资源（供竖滑跟手时露出封面预览）
+    /// 单独播放模式下相邻条目的资源（供竖滑跟手时露出封面预览）；首/尾条对应方向返回 nil
     func adjacent(_ delta: Int) -> PHAsset? {
         guard !listLoop, assets.count > 1 else { return nil }
-        return assets[(index + delta + assets.count) % assets.count]
+        let i = index + delta
+        guard i >= 0, i < assets.count else { return nil }
+        return assets[i]
     }
 
     func togglePlay() {
