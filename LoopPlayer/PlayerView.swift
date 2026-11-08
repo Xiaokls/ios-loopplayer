@@ -59,7 +59,7 @@ struct PlayerView: View {
                             withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
                             if !model.listLoop && abs(dy) > abs(dx) {
                                 // 松手时才判定：过阈值切换下一条/上一条，否则弹回
-                                if dy < -60 { model.next() } else if dy > 60 { model.previous() }
+                                if dy < -100 { model.next() } else if dy > 100 { model.previous() }
                             } else {
                                 model.seekRelative(dx / 10.0)
                                 flashTimeline()
@@ -67,15 +67,15 @@ struct PlayerView: View {
                         }
                 )
 
-                if dragOffset < -10, let next = model.adjacent(1) {
-                    let h = min(-dragOffset, 160)
+                if dragOffset < -1, let next = model.adjacent(1) {
+                    let h = min(-dragOffset, peekMax)
                     ThumbView(asset: next)
                         .frame(width: geo.size.width, height: h)
                         .clipped()
                         .position(x: geo.size.width / 2, y: geo.size.height + dragOffset + h / 2)
                 }
-                if dragOffset > 10, let prev = model.adjacent(-1) {
-                    let h = min(dragOffset, 160)
+                if dragOffset > 1, let prev = model.adjacent(-1) {
+                    let h = min(dragOffset, peekMax)
                     ThumbView(asset: prev)
                         .frame(width: geo.size.width, height: h)
                         .clipped()
@@ -113,11 +113,14 @@ struct PlayerView: View {
         .onDisappear { model.stop() }
     }
 
-    // MARK: - 竖滑橡皮筋阻尼：前 100pt 跟手 1:1，接近 160pt 上限时阻力渐增
+    // MARK: - 竖滑橡皮筋阻尼：前 60% 行程跟手 1:1，接近上限时阻力渐增
+
+    /// 竖滑画面位移/相邻封面露出的上限（pt）
+    private let peekMax: CGFloat = 300
 
     private func rubberBand(_ t: CGFloat) -> CGFloat {
-        let soft: CGFloat = 100
-        let hard: CGFloat = 160
+        let soft: CGFloat = peekMax * 0.6
+        let hard: CGFloat = peekMax
         let a = abs(t)
         let o: CGFloat
         if a <= soft {
