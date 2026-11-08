@@ -63,8 +63,8 @@ final class PlayerModel: ObservableObject {
         if listLoop && assets.count > 1 {
             currentItemObs = queue.observe(\.currentItem, options: [.old, .new]) { [weak self] q, c in
                 guard let self = self else { return }
-                if let old = c.oldValue {
-                    self.itemAssetIdx.removeValue(forKey: ObjectIdentifier(old))
+                if let old = c.oldValue, let oldItem = old {
+                    self.itemAssetIdx.removeValue(forKey: ObjectIdentifier(oldItem))
                 }
                 if let item = q.currentItem,
                    let idx = self.itemAssetIdx[ObjectIdentifier(item)] {
