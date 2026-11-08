@@ -62,14 +62,16 @@ struct PlayerView: View {
                             let dx = value.translation.width
                             let dy = value.translation.height
                             if !model.listLoop && abs(dy) > abs(dx) {
-                                // 松手时按"过半页"决定吸附到哪条，并把该页吸到屏幕中心
                                 let H = geo.size.height
-                                if dragOffset < -H / 2 {
+                                // 模拟原生滚动：用系统预测的惯性落点判定翻页，
+                                // 轻快一扫即使位移不大也能翻页；慢拖仍需过半页
+                                let p = value.predictedEndTranslation.height
+                                if dragOffset < -H / 2 || p < -H / 2 {
                                     snapAndSwitch(to: -H, forward: true)
-                                } else if dragOffset > H / 2 {
+                                } else if dragOffset > H / 2 || p > H / 2 {
                                     snapAndSwitch(to: H, forward: false)
                                 } else {
-                                    withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { dragOffset = 0 }
                                 }
                             } else {
                                 withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
@@ -129,7 +131,7 @@ struct PlayerView: View {
 
     /// 松手吸附：整页滑到屏幕中心并开始切换加载
     private func snapAndSwitch(to page: CGFloat, forward: Bool) {
-        withAnimation(.easeOut(duration: 0.25)) { dragOffset = page }
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.92)) { dragOffset = page }
         if forward { model.next() } else { model.previous() }
     }
 
