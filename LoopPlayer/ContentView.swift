@@ -21,27 +21,34 @@ struct ContentView: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
-                header
-                grid
-            }
-            .padding(.bottom, 76) // 给底部栏留出空间
+        GeometryReader { proxy in
+            // 忽略安全区布局，用 inset 手动延伸上下色块到屏幕边缘
+            let top = proxy.safeAreaInsets.top
+            let bottom = proxy.safeAreaInsets.bottom
+            ZStack(alignment: .bottom) {
+                Color(white: 0.08)
 
-            bottomBar
+                VStack(spacing: 0) {
+                    header(topInset: top)
+                    grid
+                }
+                .padding(.bottom, 68 + bottom) // 与底部栏完全贴合，不留缝
+
+                bottomBar(bottomInset: bottom)
+            }
+            .background(
+                // 自定义呈现替代 fullScreenCover：全屏时可淡化底部小白条
+                PlayerPresenter(request: $playRequest)
+                    .frame(width: 0, height: 0)
+            )
         }
-        .background(Color(white: 0.08))
+        .edgesIgnoringSafeArea(.all)
         .onAppear(perform: bootstrap)
-        .background(
-            // 自定义呈现替代 fullScreenCover：全屏时可淡化底部小白条
-            PlayerPresenter(request: $playRequest)
-                .frame(width: 0, height: 0)
-        )
     }
 
     // MARK: - 头部导航：居中相册下拉菜单
 
-    private var header: some View {
+    private func header(topInset: CGFloat) -> some View {
         ZStack {
             Color(white: 0.12)
             Menu {
@@ -62,8 +69,9 @@ struct ContentView: View {
             }
             .menuStyle(BorderlessButtonMenuStyle())
             .fixedSize()
+            .padding(.top, topInset)
         }
-        .frame(height: 52)
+        .frame(height: 52 + topInset)
     }
 
     // MARK: - 视频网格
@@ -114,7 +122,7 @@ struct ContentView: View {
 
     // MARK: - 底部导航：左侧已选缩略图（可拖拽排序、可滚动），右侧固定播放按钮
 
-    private var bottomBar: some View {
+    private func bottomBar(bottomInset: CGFloat) -> some View {
         HStack(spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -153,6 +161,8 @@ struct ContentView: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 68)
+        .padding(.bottom, bottomInset) // 内容避开小白条，色块延伸到屏幕底
+        .frame(maxWidth: .infinity)
         .background(Color(white: 0.12))
     }
 
