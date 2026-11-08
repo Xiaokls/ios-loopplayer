@@ -252,6 +252,7 @@ struct PlayerPresenter: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: PlayerPresenterVC, context: Context) {
+        uiViewController.requestBinding = $request
         uiViewController.sync(request: request)
     }
 }
@@ -259,6 +260,7 @@ struct PlayerPresenter: UIViewControllerRepresentable {
 final class PlayerPresenterVC: UIViewController {
     private var hosted: PlayerHostingController?
     private var currentID: UUID?
+    var requestBinding: Binding<PlayRequest?>?
 
     func sync(request: PlayRequest?) {
         guard let req = request, currentID != req.id else { return }
@@ -271,7 +273,8 @@ final class PlayerPresenterVC: UIViewController {
             },
             onBack: { [weak self] in
                 guard let self = self else { return }
-                self.currentID = nil
+                // 先清空请求，防止随后重渲染时 sync 把播放页再次弹出
+                self.requestBinding?.wrappedValue = nil
                 self.hosted?.dismiss(animated: true)
             }
         )
