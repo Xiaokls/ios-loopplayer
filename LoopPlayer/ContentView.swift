@@ -27,6 +27,8 @@ struct ContentView: View {
     @State private var authDenied = false
     @State private var playRequest: PlayRequest?
     @State private var draggingId: String?
+    /// 上次已选数量：仅在新增选中时自动滚动
+    @State private var lastSelCount = 0
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
 
@@ -137,17 +139,31 @@ struct ContentView: View {
 
     private func bottomBar(bottomInset: CGFloat) -> some View {
         HStack(spacing: 12) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(selection.items, id: \.localIdentifier) { item in
-                        ThumbView(asset: item)
-                            .frame(width: 52, height: 52)
-                            .clipped()
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color(white: 0.3), lineWidth: 1)
-                            )
+            ScrollViewReader { scroll in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(selection.items, id: \.localIdentifier) { item in
+                            ZStack(alignment: .topTrailing) {
+                                ThumbView(asset: item)
+                                    .frame(width: 52, height: 52)
+                                    .clipped()
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color(white: 0.3), lineWidth: 1)
+                                    )
+
+                                // 右上角白色 x：取消选择该项
+                                Button(action: { selection.remove(item) }) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(width: 22, height: 22)
+                                        .background(Circle().fill(Color.black.opacity(0.55)))
+                                        .contentShape(Circle())
+                                }
+                            }
+                            .id(item.localIdentifier)
                             .onDrag {
                                 draggingId = item.localIdentifier
                                 return NSItemProvider(object: item.localIdentifier as NSString)
@@ -160,9 +176,19 @@ struct ContentView: View {
                                     draggingId: $draggingId
                                 )
                             )
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .onChange(of: selection.items.count) { newCount in
+                    let grew = newCount > lastSelCount
+                    lastSelCount = newCount
+                    // 新增选中项时自动向后滚动，让最新选中的可见
+                    guard grew, let lastId = selection.items.last?.localIdentifier else { return }
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        scroll.scrollTo(lastId, anchor: .trailing)
                     }
                 }
-                .padding(.horizontal, 4)
             }
 
             Button(action: playSelection) {

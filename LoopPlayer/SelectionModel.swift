@@ -27,5 +27,9 @@ final class SelectionModel: ObservableObject {
         items.insert(dragged, at: min(slot, items.count))
     }
 
+    func remove(_ asset: PHAsset) {
+        items.removeAll { $0.localIdentifier == asset.localIdentifier }
+    }
+
     func clear() { items.removeAll() }
 }
