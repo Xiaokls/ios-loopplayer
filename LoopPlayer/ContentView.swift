@@ -111,7 +111,7 @@ struct ContentView: View {
             ThumbView(asset: asset)
                 .frame(width: side, height: side)
                 .clipped()
-                .overlay(Color.black.opacity(selected ? 0.1 : 0)) // 选中时降 10% 亮度
+                .overlay(Color.black.opacity(selected ? 0.25 : 0)) // 选中时降 25% 亮度
 
             // 右上角多选控件：选中为绿色实心圆（无对勾），44pt 点击区
             Button(action: { selection.toggle(asset) }) {
