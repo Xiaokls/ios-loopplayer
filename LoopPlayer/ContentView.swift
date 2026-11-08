@@ -53,9 +53,9 @@ struct ContentView: View {
             } label: {
                 HStack(spacing: 6) {
                     Text(albums.isEmpty ? "相册" : albums[albumIndex].title)
-                        .font(.system(size: 17, weight: 600))
+                        .font(.system(size: 17, weight: .semibold))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: 600))
+                        .font(.system(size: 12, weight: .semibold))
                 }
                 .foregroundColor(.primary)
             }

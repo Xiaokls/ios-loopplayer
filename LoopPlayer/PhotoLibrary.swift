@@ -2,21 +2,21 @@ import Photos
 import UIKit
 import SwiftUI
 
-/// 相册条目。collection 为 nil 表示伪相册「最近项目」
+/// 相册条目。collection 为 nil 表示伪相册（「最近项目」或「已隐藏」）
 struct AlbumItem {
     let title: String
     let collection: PHAssetCollection?
-    /// 已隐藏目录需要包含隐藏资产，其余目录默认排除
+    /// true 表示「已隐藏」目录：只含隐藏资产；其余目录默认排除隐藏
     var includeHidden: Bool = false
 }
 
 enum PhotoLib {
 
-    /// 只含视频的筛选选项，按拍摄时间倒序
-    static func videoOptions(includeHidden: Bool = false) -> PHFetchOptions {
+    /// 只含视频的筛选选项，按拍摄时间倒序；hiddenOnly=true 时只取隐藏视频
+    static func videoOptions(hiddenOnly: Bool = false) -> PHFetchOptions {
         let o = PHFetchOptions()
-        if includeHidden {
-            o.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.video.rawValue)
+        if hiddenOnly {
+            o.predicate = NSPredicate(format: "mediaType = %d AND isHidden = 1", PHAssetMediaType.video.rawValue)
         } else {
             o.predicate = NSPredicate(format: "mediaType = %d AND isHidden = 0", PHAssetMediaType.video.rawValue)
         }
@@ -41,14 +41,10 @@ enum PhotoLib {
             }
         }
 
-        // 系统「已隐藏」相册，作为独立目录列在末尾
-        let hidden = PHAssetCollection.fetchAssetCollections(
-            with: .smartAlbum, subtype: .smartAlbumHidden, options: nil)
-        hidden.enumerateObjects { col, _, _ in
-            let videos = PHAsset.fetchAssets(in: col, options: videoOptions(includeHidden: true))
-            if videos.count > 0 {
-                result.append(AlbumItem(title: "已隐藏", collection: col, includeHidden: true))
-            }
+        // 「已隐藏」独立目录：Photos 框架没有隐藏相册集合，用 isHidden 谓词构造伪相册
+        let hiddenCount = PHAsset.fetchAssets(with: .video, options: videoOptions(hiddenOnly: true)).count
+        if hiddenCount > 0 {
+            result.append(AlbumItem(title: "已隐藏", collection: nil, includeHidden: true))
         }
         return result
     }
@@ -56,7 +52,7 @@ enum PhotoLib {
     /// 获取某相册内全部视频资源
     static func fetchVideos(in album: AlbumItem) -> [PHAsset] {
         var assets: [PHAsset] = []
-        let options = videoOptions(includeHidden: album.includeHidden)
+        let options = videoOptions(hiddenOnly: album.includeHidden)
         let result: PHFetchResult<PHAsset>
         if let col = album.collection {
             result = PHAsset.fetchAssets(in: col, options: options)

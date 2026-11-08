@@ -39,7 +39,7 @@ final class PlayerModel: ObservableObject {
     private func loadCurrent() {
         guard index >= 0, index < assets.count else { return }
         let options = PHVideoRequestOptions()
-        options.networkAccessAllowed = true   // iCloud 视频允许联网取流
+        options.isNetworkAccessAllowed = true   // iCloud 视频允许联网取流
         PHImageManager.default().requestAVAsset(forVideo: assets[index], options: options) { [weak self] avAsset, _, _ in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -52,7 +52,7 @@ final class PlayerModel: ObservableObject {
 
                 let item = AVPlayerItem(asset: avAsset)
                 if self.listLoop {
-                    self.queue.append(item)
+                    self.queue.insert(item, at: 0)
                     self.endObserver = NotificationCenter.default.addObserver(
                         forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
                     ) { [weak self] _ in
