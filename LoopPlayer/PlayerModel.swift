@@ -277,6 +277,8 @@ final class PlayerModel: ObservableObject {
                     finish(nil)
                 }
             }
+            // 未挂载到播放器前状态不会自己变，必须主动触发异步加载
+            item.prepare()
         }
     }
 

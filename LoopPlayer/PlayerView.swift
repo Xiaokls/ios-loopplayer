@@ -23,17 +23,11 @@ struct PlayerView: View {
             ZStack(alignment: .top) {
                 Color.black
 
-                // 视频与相邻封面拼成一个整体随手指移动，保证边缘严格衔接
-                VStack(spacing: 0) {
-                    if dragOffset > 10, let prev = model.adjacent(-1) {
-                        ThumbView(asset: prev)
-                            .frame(width: geo.size.width, height: min(dragOffset, 160))
-                            .clipped()
-                    }
-
-                    VideoSurface(player: model.queue, fill: fullscreen)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .contentShape(Rectangle())
+                // 视频整体随手指移动；相邻封面用绝对定位贴紧视频上下缘，不参与布局、无跳动
+                VideoSurface(player: model.queue, fill: fullscreen)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .offset(y: dragOffset)
+                    .contentShape(Rectangle())
                 .onTapGesture { model.togglePlay() }
                 .gesture(
                     MagnificationGesture()
@@ -82,13 +76,20 @@ struct PlayerView: View {
                         }
                 )
 
-                    if dragOffset < -10, let next = model.adjacent(1) {
-                        ThumbView(asset: next)
-                            .frame(width: geo.size.width, height: min(-dragOffset, 160))
-                            .clipped()
-                    }
+                if dragOffset < -10, let next = model.adjacent(1) {
+                    let h = min(-dragOffset, 160)
+                    ThumbView(asset: next)
+                        .frame(width: geo.size.width, height: h)
+                        .clipped()
+                        .position(x: geo.size.width / 2, y: geo.size.height + dragOffset + h / 2)
                 }
-                .offset(y: dragOffset)
+                if dragOffset > 10, let prev = model.adjacent(-1) {
+                    let h = min(dragOffset, 160)
+                    ThumbView(asset: prev)
+                        .frame(width: geo.size.width, height: h)
+                        .clipped()
+                        .position(x: geo.size.width / 2, y: dragOffset - h / 2)
+                }
 
                 if !fullscreen {
                 header
