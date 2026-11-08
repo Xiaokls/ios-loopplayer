@@ -99,22 +99,28 @@ struct ContentView: View {
     }
 
     private func cell(_ asset: PHAsset, side: CGFloat) -> some View {
-        ZStack(alignment: .topTrailing) {
+        let selected = selection.contains(asset)
+        return ZStack(alignment: .topTrailing) {
             ThumbView(asset: asset)
                 .frame(width: side, height: side)
                 .clipped()
+                .overlay(Color.black.opacity(selected ? 0.1 : 0)) // 选中时降 10% 亮度
 
             // 右上角多选控件：选中为绿色实心圆（无对勾），44pt 点击区
             Button(action: { selection.toggle(asset) }) {
-                Image(systemName: selection.contains(asset) ? "circle.fill" : "circle")
+                Image(systemName: selected ? "circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundColor(selection.contains(asset) ? .green : .white)
+                    .foregroundColor(selected ? .green : .white)
                     .shadow(color: .black.opacity(0.6), radius: 2)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
         }
         .frame(width: side, height: side)
+        .overlay(
+            // 选中时单元格内缘 1px 绿色边框（strokeBorder 保证线画在格内）
+            Rectangle().strokeBorder(Color.green, lineWidth: selected ? 1 : 0)
+        )
         .background(Color(white: 0.15))
         .contentShape(Rectangle())
         .onTapGesture { playSingle(asset) } // 单击直接播放该文件
