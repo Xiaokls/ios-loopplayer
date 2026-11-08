@@ -152,26 +152,26 @@ struct PlayerView: View {
 
     @ViewBuilder
     private var progressBar: some View {
-        if model.duration > 0 {
+        if model.sliderTotal > 0 {
             VStack(spacing: 2) {
                 SlimSlider(
                     value: Binding(
-                        get: { min(model.currentTime, model.duration) },
+                        get: { model.sliderValue },
                         set: { newValue in
                             model.isScrubbing = true
-                            model.currentTime = newValue
+                            model.setSlider(newValue)
                         }
                     ),
-                    range: 0...model.duration,
+                    range: 0...model.sliderTotal,
                     onCommit: {
-                        model.seek(to: model.currentTime)
+                        model.commitScrub()
                         model.isScrubbing = false
                     }
                 )
                 HStack {
-                    Text(timeString(model.currentTime))
+                    Text(timeString(model.sliderValue))
                     Spacer()
-                    Text(timeString(model.duration))
+                    Text(timeString(model.sliderTotal))
                 }
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundColor(.white.opacity(0.85))
