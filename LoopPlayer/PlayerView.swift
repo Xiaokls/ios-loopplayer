@@ -27,7 +27,8 @@ struct PlayerView: View {
                 VStack(spacing: 0) {
                     if dragOffset > 10, let prev = model.adjacent(-1) {
                         ThumbView(asset: prev)
-                            .frame(height: min(dragOffset, 160))
+                            .frame(width: geo.size.width, height: min(dragOffset, 160))
+                            .clipped()
                     }
 
                     VideoSurface(player: model.queue, fill: fullscreen)
@@ -65,7 +66,12 @@ struct PlayerView: View {
                         .onEnded { value in
                             let dx = value.translation.width
                             let dy = value.translation.height
-                            if snapping { return }
+                            if snapping {
+                                // 吸走切换后必须重新起手，防止按住不放连续跳
+                                snapping = false
+                                dragOffset = 0
+                                return
+                            }
                             withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
                             if !model.listLoop && abs(dy) > abs(dx) {
                                 // 未达临界点已弹回，不切换
@@ -78,7 +84,8 @@ struct PlayerView: View {
 
                     if dragOffset < -10, let next = model.adjacent(1) {
                         ThumbView(asset: next)
-                            .frame(height: min(-dragOffset, 160))
+                            .frame(width: geo.size.width, height: min(-dragOffset, 160))
+                            .clipped()
                     }
                 }
                 .offset(y: dragOffset)
@@ -123,7 +130,7 @@ struct PlayerView: View {
         withAnimation(.easeIn(duration: 0.22)) { dragOffset = dir * 160 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
             dragOffset = 0
-            snapping = false
+            // snapping 不在此复位：必须等手指抬起（onEnded）才允许下一次切换
         }
     }
 

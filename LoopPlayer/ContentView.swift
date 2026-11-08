@@ -156,9 +156,9 @@ struct ContentView: View {
                                 // 右上角白色 x：取消选择该项
                                 Button(action: { selection.remove(item) }) {
                                     Image(systemName: "xmark")
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(.system(size: 9, weight: .bold))
                                         .foregroundColor(.white)
-                                        .frame(width: 22, height: 22)
+                                        .frame(width: 16, height: 16)
                                         .background(Circle().fill(Color.black.opacity(0.55)))
                                         .contentShape(Circle())
                                 }
