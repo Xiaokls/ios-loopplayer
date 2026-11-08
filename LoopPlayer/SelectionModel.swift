@@ -17,16 +17,14 @@ final class SelectionModel: ObservableObject {
         }
     }
 
-    /// 把 draggedId 对应的资源移动到 target 之前
-    func move(draggedId: String, before target: PHAsset) {
+    /// 把 draggedId 对应的资源移动到 target 所在的槽位：
+    /// 从左往右拖落到 target 之后，从右往左拖落到 target 之前（两项互换也能成功）
+    func move(draggedId: String, to target: PHAsset) {
         guard let from = items.firstIndex(where: { $0.localIdentifier == draggedId }) else { return }
-        guard items[from].localIdentifier != target.localIdentifier else { return }
+        guard let slot = items.firstIndex(where: { $0.localIdentifier == target.localIdentifier }),
+              from != slot else { return }
         let dragged = items.remove(at: from)
-        guard let to = items.firstIndex(where: { $0.localIdentifier == target.localIdentifier }) else {
-            items.insert(dragged, at: min(from, items.count))
-            return
-        }
-        items.insert(dragged, at: to)
+        items.insert(dragged, at: min(slot, items.count))
     }
 
     func clear() { items.removeAll() }

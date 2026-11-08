@@ -102,13 +102,12 @@ struct PlayerView: View {
 
             Button(action: { presentation.wrappedValue.dismiss() }) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.white.opacity(0.18)))
-                    .contentShape(Circle())
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(.leading, 10)
+            .padding(.leading, 6)
             .padding(.top, 2)
         }
         .edgesIgnoringSafeArea(.top)
@@ -139,7 +138,7 @@ struct PlayerView: View {
                     Spacer()
                     Text(timeString(model.duration))
                 }
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundColor(.white.opacity(0.85))
             }
             .padding(.horizontal, 16)

@@ -54,6 +54,9 @@ struct ContentView: View {
                 HStack(spacing: 6) {
                     Text(albums.isEmpty ? "相册" : albums[albumIndex].title)
                         .font(.system(size: 17, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .layoutPriority(1)
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
                 }
@@ -206,7 +209,7 @@ private struct ReorderDelegate: DropDelegate {
 
     func dropEntered(info: DropInfo) {
         guard let id = draggingId else { return }
-        selection.move(draggedId: id, before: target)
+        selection.move(draggedId: id, to: target)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
