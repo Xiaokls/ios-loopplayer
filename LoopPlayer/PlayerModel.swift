@@ -2,8 +2,9 @@ import AVFoundation
 import Photos
 
 /// 播放队列模型。
-/// listLoop = true：按队列顺序连播，最后一个播完自动回到第一个（多选播放）
-/// listLoop = false：单文件无限循环（单击播放）
+/// listLoop = true：多选连播。AVQueuePlayer 滑动窗口预取（始终保持 2 个就绪条目入队），
+/// 播完自动无缝衔接下一条，列表末尾回到开头无限循环。
+/// listLoop = false：单文件无限循环（单击播放），上下滑切换相邻条目。
 final class PlayerModel: ObservableObject {
     @Published var isPlaying = false
     @Published var failed = false
@@ -18,9 +19,14 @@ final class PlayerModel: ObservableObject {
     private var index: Int
     let listLoop: Bool
     private var looper: AVPlayerLooper?
-    private var endObserver: NSObjectProtocol?
     private var timeObserver: Any?
     private var stopped = false
+
+    // 连播预取状态（insertCursor 为已入队绝对计数，跨圈循环）
+    private var readyItems: [Int: AVPlayerItem] = [:]
+    private var inFlight: Set<Int> = []
+    private var insertCursor = 0
+    private var generation = 0
 
     init(assets: [PHAsset], startIndex: Int, listLoop: Bool) {
         self.assets = assets
@@ -36,19 +42,26 @@ final class PlayerModel: ObservableObject {
                 let d = CMTimeGetSeconds(item.duration)
                 if d.isFinite && d > 0 { self.duration = d }
             }
+            if self.listLoop { self.fillQueue() }
         }
-        loadCurrent()
+        if listLoop && assets.count > 1 {
+            startList()
+        } else {
+            loadCurrent()
+        }
     }
 
     deinit {
         queue.pause()
-        if let obs = endObserver { NotificationCenter.default.removeObserver(obs) }
         if let to = timeObserver { queue.removeTimeObserver(to) }
     }
 
     /// 退出播放页时调用：停止并释放队列，防止音频挂死
     func stop() {
         stopped = true
+        generation += 1
+        readyItems.removeAll()
+        inFlight.removeAll()
         queue.pause()
         reset()
     }
@@ -77,6 +90,12 @@ final class PlayerModel: ObservableObject {
         loadCurrent()
     }
 
+    /// 单独播放模式下相邻条目的资源（供竖滑跟手时露出封面预览）
+    func adjacent(_ delta: Int) -> PHAsset? {
+        guard !listLoop, assets.count > 1 else { return nil }
+        return assets[(index + delta + assets.count) % assets.count]
+    }
+
     func togglePlay() {
         if isPlaying {
             queue.pause()
@@ -86,10 +105,61 @@ final class PlayerModel: ObservableObject {
         isPlaying.toggle()
     }
 
+    // MARK: - 连播：滑动窗口预取
+
+    private func startList() {
+        generation += 1
+        readyItems.removeAll()
+        inFlight.removeAll()
+        insertCursor = 0
+        failed = false
+        fillQueue()
+        queue.play()
+        isPlaying = true
+    }
+
+    /// 保持队列里始终有 2 个就绪条目；播完的条目由 AVQueuePlayer 自动移除并无缝接上
+    private func fillQueue() {
+        guard !stopped, listLoop, assets.count > 1 else { return }
+        while queue.items().count < 2 {
+            let key = insertCursor
+            if let item = readyItems.removeValue(forKey: key) {
+                queue.insert(item, after: nil)
+                insertCursor += 1
+            } else {
+                prefetch(key: key)
+                break
+            }
+        }
+    }
+
+    private func prefetch(key: Int) {
+        guard !inFlight.contains(key) else { return }
+        inFlight.insert(key)
+        let asset = assets[key % assets.count]
+        let options = PHVideoRequestOptions()
+        options.isNetworkAccessAllowed = true   // iCloud 视频允许联网取流
+        let gen = generation
+        PHImageManager.default().requestAVAsset(forVideo: asset, options: options) { [weak self] avAsset, _, _ in
+            DispatchQueue.main.async {
+                guard let self = self, !self.stopped, self.generation == gen else { return }
+                self.inFlight.remove(key)
+                guard let avAsset = avAsset else {
+                    self.failed = true
+                    return
+                }
+                self.readyItems[key] = AVPlayerItem(asset: avAsset)
+                self.fillQueue()
+            }
+        }
+    }
+
+    // MARK: - 单曲循环
+
     private func loadCurrent() {
         guard index >= 0, index < assets.count else { return }
         let options = PHVideoRequestOptions()
-        options.isNetworkAccessAllowed = true   // iCloud 视频允许联网取流
+        options.isNetworkAccessAllowed = true
         PHImageManager.default().requestAVAsset(forVideo: assets[index], options: options) { [weak self] avAsset, _, _ in
             DispatchQueue.main.async {
                 guard let self = self, !self.stopped else { return }
@@ -101,33 +171,14 @@ final class PlayerModel: ObservableObject {
                 self.reset()
 
                 let item = AVPlayerItem(asset: avAsset)
-                if self.listLoop {
-                    self.queue.insert(item, after: nil)
-                    self.endObserver = NotificationCenter.default.addObserver(
-                        forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
-                    ) { [weak self] _ in
-                        self?.advance()
-                    }
-                } else {
-                    // 单曲无缝循环
-                    self.looper = AVPlayerLooper(player: self.queue, templateItem: item)
-                }
+                self.looper = AVPlayerLooper(player: self.queue, templateItem: item)
                 self.queue.play()
                 self.isPlaying = true
             }
         }
     }
 
-    private func advance() {
-        index = (index + 1) % assets.count
-        loadCurrent()
-    }
-
     private func reset() {
-        if let obs = endObserver {
-            NotificationCenter.default.removeObserver(obs)
-            endObserver = nil
-        }
         looper = nil
         queue.removeAllItems()
         currentTime = 0

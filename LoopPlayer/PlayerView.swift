@@ -9,6 +9,8 @@ struct PlayerView: View {
     @State private var pinchValue: CGFloat = 1
     @State private var timelineVisible = false
     @State private var hideTimelineTask: DispatchWorkItem?
+    /// 竖滑跟手时画面的纵向位移（已乘阻尼系数）
+    @State private var dragOffset: CGFloat = 0
     /// 全屏状态变化回调（宿主控制器据此淡化 Home 小白条）
     var onFullscreenChanged: ((Bool) -> Void)? = nil
     /// 返回按钮回调（宿主控制器直接 dismiss，比 presentationMode 更可靠）
@@ -20,6 +22,7 @@ struct PlayerView: View {
 
             VideoSurface(player: model.queue, fill: fullscreen)
                 .edgesIgnoringSafeArea(.all)
+                .offset(y: dragOffset)
                 .contentShape(Rectangle())
                 .onTapGesture { model.togglePlay() }
                 .gesture(
@@ -35,17 +38,22 @@ struct PlayerView: View {
                             onFullscreenChanged?(fullscreen)
                         }
                 )
-                // 横滑=调进度（约每 10pt = 1 秒）；单独播放时竖滑=切换上/下一条（全屏下同样生效）
+                // 横滑=调进度（约每 10pt = 1 秒）；单独播放时竖滑=画面跟手并露出相邻封面，松手切换
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 25)
                         .onChanged { value in
-                            if abs(value.translation.width) >= abs(value.translation.height) {
+                            let tx = abs(value.translation.width)
+                            let ty = value.translation.height
+                            if !model.listLoop && abs(ty) > tx {
+                                dragOffset = ty * 0.5
+                            } else if tx >= abs(ty) {
                                 flashTimeline()
                             }
                         }
                         .onEnded { value in
                             let dx = value.translation.width
                             let dy = value.translation.height
+                            withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
                             if !model.listLoop && abs(dy) > abs(dx) {
                                 if dy < -60 { model.next() } else if dy > 60 { model.previous() }
                             } else {
@@ -54,6 +62,24 @@ struct PlayerView: View {
                             }
                         }
                 )
+
+            // 竖滑跟手时，从边缘露出相邻条目的封面
+            if dragOffset < -10, let next = model.adjacent(1) {
+                VStack(spacing: 0) {
+                    Spacer()
+                    ThumbView(asset: next)
+                        .frame(height: min(-dragOffset, 160))
+                }
+                .edgesIgnoringSafeArea(.bottom)
+            }
+            if dragOffset > 10, let prev = model.adjacent(-1) {
+                VStack(spacing: 0) {
+                    ThumbView(asset: prev)
+                        .frame(height: min(dragOffset, 160))
+                    Spacer()
+                }
+                .edgesIgnoringSafeArea(.top)
+            }
 
             if !fullscreen {
                 header
