@@ -41,11 +41,8 @@ enum PhotoLib {
             }
         }
 
-        // 「已隐藏」独立目录：Photos 框架没有隐藏相册集合，用 isHidden 谓词构造伪相册
-        let hiddenCount = PHAsset.fetchAssets(with: .video, options: videoOptions(hiddenOnly: true)).count
-        if hiddenCount > 0 {
-            result.append(AlbumItem(title: "已隐藏", collection: nil, includeHidden: true))
-        }
+        // 「已隐藏」独立目录：Photos 框架没有隐藏相册集合，用 isHidden 谓词构造伪相册（始终显示）
+        result.append(AlbumItem(title: "已隐藏", collection: nil, includeHidden: true))
         return result
     }
 

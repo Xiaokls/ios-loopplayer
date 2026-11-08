@@ -7,6 +7,8 @@ import Photos
 final class PlayerModel: ObservableObject {
     @Published var isPlaying = false
     @Published var failed = false
+    @Published var currentTime: Double = 0
+    @Published var duration: Double = 0
 
     let queue = AVQueuePlayer()
 
@@ -15,16 +17,41 @@ final class PlayerModel: ObservableObject {
     private let listLoop: Bool
     private var looper: AVPlayerLooper?
     private var endObserver: NSObjectProtocol?
+    private var timeObserver: Any?
 
     init(assets: [PHAsset], startIndex: Int, listLoop: Bool) {
         self.assets = assets
         self.index = startIndex
         self.listLoop = listLoop
+        timeObserver = queue.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self] t in
+            guard let self = self else { return }
+            self.currentTime = CMTimeGetSeconds(t)
+            if let item = self.queue.currentItem {
+                let d = CMTimeGetSeconds(item.duration)
+                if d.isFinite && d > 0 { self.duration = d }
+            }
+        }
         loadCurrent()
     }
 
     deinit {
         if let obs = endObserver { NotificationCenter.default.removeObserver(obs) }
+        if let to = timeObserver { queue.removeTimeObserver(to) }
+    }
+
+    /// 跳转到指定秒
+    func seek(to seconds: Double) {
+        let clamped = min(max(seconds, 0), max(duration - 0.3, 0))
+        queue.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
+        currentTime = clamped
+    }
+
+    /// 相对当前进度快进/快退（左右滑动用）
+    func seekRelative(_ delta: Double) {
+        seek(to: currentTime + delta)
     }
 
     func togglePlay() {

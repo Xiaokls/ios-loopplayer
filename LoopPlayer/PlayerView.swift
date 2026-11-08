@@ -28,8 +28,20 @@ struct PlayerView: View {
                             pinchValue = 1
                         }
                 )
+                // 左右滑动调整播放进度：约每 10pt = 1 秒
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 25)
+                        .onEnded { value in
+                            model.seekRelative(value.translation.width / 10.0)
+                        }
+                )
 
             header
+
+            VStack {
+                Spacer()
+                progressBar
+            }
 
             if model.failed {
                 VStack(spacing: 8) {
@@ -56,15 +68,59 @@ struct PlayerView: View {
             .frame(height: 90)
 
             Button(action: { presentation.wrappedValue.dismiss() }) {
-                Text("<")
-                    .font(.system(size: 26, weight: .medium, design: .rounded))
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Color.white.opacity(0.18)))
+                    .contentShape(Circle())
             }
-            .padding(.leading, 8)
+            .padding(.leading, 10)
             .padding(.top, 2)
         }
         .edgesIgnoringSafeArea(.top)
+    }
+
+    // MARK: - 底部进度条
+
+    @ViewBuilder
+    private var progressBar: some View {
+        if model.duration > 0 {
+            VStack(spacing: 2) {
+                Slider(
+                    value: Binding(
+                        get: { min(model.currentTime, model.duration) },
+                        set: { model.currentTime = $0 }
+                    ),
+                    in: 0...model.duration,
+                    onEditingChanged: { editing in
+                        if !editing { model.seek(to: model.currentTime) }
+                    }
+                )
+                .accentColor(.green)
+                HStack {
+                    Text(timeString(model.currentTime))
+                    Spacer()
+                    Text(timeString(model.duration))
+                }
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.85))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                LinearGradient(
+                    colors: [Color.clear, Color.black.opacity(0.55)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .ignoresSafeArea(edges: .bottom)
+            )
+        }
+    }
+
+    private func timeString(_ seconds: Double) -> String {
+        let s = Int(seconds.isFinite ? seconds : 0)
+        return String(format: "%d:%02d", s / 60, s % 60)
     }
 }
 

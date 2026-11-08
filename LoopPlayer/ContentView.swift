@@ -18,7 +18,7 @@ struct ContentView: View {
     @State private var playRequest: PlayRequest?
     @State private var draggingId: String?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -68,39 +68,45 @@ struct ContentView: View {
     // MARK: - 视频网格
 
     private var grid: some View {
-        ScrollView {
-            if authDenied {
-                Text("没有相册访问权限\n请到 设置 > 隐私 > 照片 中开启")
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 60)
-            } else {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(videos, id: \.localIdentifier) { asset in
-                        cell(asset)
+        GeometryReader { proxy in
+            // 三等分栅格：1px 间距，单元格严格正方形
+            let side = floor((proxy.size.width - 4) / 3)
+            ScrollView {
+                if authDenied {
+                    Text("没有相册访问权限\n请到 设置 > 隐私 > 照片 中开启")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 60)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 1) {
+                        ForEach(videos, id: \.localIdentifier) { asset in
+                            cell(asset, side: side)
+                        }
                     }
+                    .padding(1)
                 }
-                .padding(8)
             }
         }
     }
 
-    private func cell(_ asset: PHAsset) -> some View {
+    private func cell(_ asset: PHAsset, side: CGFloat) -> some View {
         ZStack(alignment: .topTrailing) {
             ThumbView(asset: asset)
-                .aspectRatio(1, contentMode: .fill)
+                .frame(width: side, height: side)
                 .clipped()
-                .cornerRadius(6)
 
-            // 右上角多选控件：选中为绿色实心圆（无对勾）
+            // 右上角多选控件：选中为绿色实心圆（无对勾），44pt 点击区
             Button(action: { selection.toggle(asset) }) {
                 Image(systemName: selection.contains(asset) ? "circle.fill" : "circle")
                     .font(.system(size: 22))
                     .foregroundColor(selection.contains(asset) ? .green : .white)
-                    .shadow(radius: 2)
+                    .shadow(color: .black.opacity(0.6), radius: 2)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(6)
         }
+        .frame(width: side, height: side)
+        .background(Color(white: 0.15))
         .contentShape(Rectangle())
         .onTapGesture { playSingle(asset) } // 单击直接播放该文件
     }
