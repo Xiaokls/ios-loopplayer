@@ -249,36 +249,14 @@ final class PlayerModel: ObservableObject {
         }
     }
 
-    /// 条目 readyToPlay 后才进入就绪池，避免切换瞬间队列停顿造成顿挫
+    /// 素材取到即入就绪池。AVQueuePlayer 会对队列内条目自动预滚动，
+    /// 切换时由队列保证衔接；iOS 14 SDK 无法在未挂载前触发 AVPlayerItem 加载，故不做就绪门控
     private func publish(item: AVPlayerItem, key: Int, gen: Int) {
-        let finish: (AVPlayerItem?) -> Void = { [weak self] ready in
-            guard let self = self, !self.stopped, self.generation == gen else { return }
+        DispatchQueue.main.async {
+            guard !self.stopped, self.generation == gen else { return }
             self.inFlight.remove(key)
-            if let ready = ready {
-                self.readyItems[key] = ready
-                self.fillQueue()
-            } else {
-                self.failed = true
-            }
-        }
-        switch item.status {
-        case .readyToPlay:
-            finish(item)
-        case .failed:
-            finish(nil)
-        default:
-            var token: NSKeyValueObservation?
-            token = item.observe(\.status, options: [.new]) { it, _ in
-                if it.status == .readyToPlay {
-                    token?.invalidate()
-                    finish(it)
-                } else if it.status == .failed {
-                    token?.invalidate()
-                    finish(nil)
-                }
-            }
-            // 未挂载到播放器前状态不会自己变，必须主动触发异步加载（AVPlayerItem 的方法名）
-            item.prepareToPlay()
+            self.readyItems[key] = item
+            self.fillQueue()
         }
     }
 
