@@ -158,7 +158,9 @@ struct ContentView: View {
     // MARK: - 行为
 
     private func playSingle(_ asset: PHAsset) {
-        playRequest = PlayRequest(assets: [asset], startIndex: 0, listLoop: false)
+        // 传入整个相册列表：播放页内上滑/下滑可切换相邻视频
+        let idx = videos.firstIndex { $0.localIdentifier == asset.localIdentifier } ?? 0
+        playRequest = PlayRequest(assets: videos, startIndex: idx, listLoop: false)
     }
 
     private func playSelection() {

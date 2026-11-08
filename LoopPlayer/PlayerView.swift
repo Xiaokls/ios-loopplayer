@@ -30,13 +30,23 @@ struct PlayerView: View {
                             pinchValue = 1
                         }
                 )
-                // 左右滑动调整播放进度：约每 10pt = 1 秒；全屏下滑动时临时显示时间轴
+                // 横滑=调进度（约每 10pt = 1 秒）；单独播放时竖滑=切换上/下一条（全屏下同样生效）
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 25)
-                        .onChanged { _ in flashTimeline() }
+                        .onChanged { value in
+                            if abs(value.translation.width) >= abs(value.translation.height) {
+                                flashTimeline()
+                            }
+                        }
                         .onEnded { value in
-                            model.seekRelative(value.translation.width / 10.0)
-                            flashTimeline()
+                            let dx = value.translation.width
+                            let dy = value.translation.height
+                            if !model.listLoop && abs(dy) > abs(dx) {
+                                if dy < -60 { model.next() } else if dy > 60 { model.previous() }
+                            } else {
+                                model.seekRelative(dx / 10.0)
+                                flashTimeline()
+                            }
                         }
                 )
 
@@ -66,6 +76,7 @@ struct PlayerView: View {
                 .offset(y: 120)
             }
         }
+        .onDisappear { model.stop() }
     }
 
     // MARK: - 全屏下滑动时临时显示时间轴，2 秒后自动隐藏

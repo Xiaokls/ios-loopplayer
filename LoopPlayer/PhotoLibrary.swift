@@ -54,7 +54,9 @@ enum PhotoLib {
             guard isHiddenAlbum || isFavorites else { return }
             let videos = PHAsset.fetchAssets(in: col, options: videoOptions(includeHidden: true))
             guard videos.count > 0 else { return }
-            let item = AlbumItem(title: title, collection: col, includeHidden: true)
+            // 系统返回的 localizedTitle 可能是英文（Hidden），统一用中文显示名
+            let displayTitle = isHiddenAlbum ? "已隐藏" : "个人收藏"
+            let item = AlbumItem(title: displayTitle, collection: col, includeHidden: true)
             if isHiddenAlbum { hiddenItem = item } else { favoritesItem = item }
         }
 

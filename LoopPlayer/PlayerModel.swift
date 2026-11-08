@@ -16,10 +16,11 @@ final class PlayerModel: ObservableObject {
 
     private let assets: [PHAsset]
     private var index: Int
-    private let listLoop: Bool
+    let listLoop: Bool
     private var looper: AVPlayerLooper?
     private var endObserver: NSObjectProtocol?
     private var timeObserver: Any?
+    private var stopped = false
 
     init(assets: [PHAsset], startIndex: Int, listLoop: Bool) {
         self.assets = assets
@@ -40,8 +41,16 @@ final class PlayerModel: ObservableObject {
     }
 
     deinit {
+        queue.pause()
         if let obs = endObserver { NotificationCenter.default.removeObserver(obs) }
         if let to = timeObserver { queue.removeTimeObserver(to) }
+    }
+
+    /// 退出播放页时调用：停止并释放队列，防止音频挂死
+    func stop() {
+        stopped = true
+        queue.pause()
+        reset()
     }
 
     /// 跳转到指定秒
@@ -54,6 +63,18 @@ final class PlayerModel: ObservableObject {
     /// 相对当前进度快进/快退（左右滑动用）
     func seekRelative(_ delta: Double) {
         seek(to: currentTime + delta)
+    }
+
+    /// 上滑切换下一条（仅单独播放模式）
+    func next() { switchRelative(1) }
+
+    /// 下滑切换上一条（仅单独播放模式）
+    func previous() { switchRelative(-1) }
+
+    private func switchRelative(_ delta: Int) {
+        guard !listLoop, !stopped, assets.count > 1 else { return }
+        index = (index + delta + assets.count) % assets.count
+        loadCurrent()
     }
 
     func togglePlay() {
@@ -71,7 +92,7 @@ final class PlayerModel: ObservableObject {
         options.isNetworkAccessAllowed = true   // iCloud 视频允许联网取流
         PHImageManager.default().requestAVAsset(forVideo: assets[index], options: options) { [weak self] avAsset, _, _ in
             DispatchQueue.main.async {
-                guard let self = self else { return }
+                guard let self = self, !self.stopped else { return }
                 guard let avAsset = avAsset else {
                     self.failed = true
                     return
@@ -109,5 +130,7 @@ final class PlayerModel: ObservableObject {
         }
         looper = nil
         queue.removeAllItems()
+        currentTime = 0
+        duration = 0
     }
 }
