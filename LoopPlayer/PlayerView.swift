@@ -40,7 +40,7 @@ struct PlayerView: View {
                             onFullscreenChanged?(fullscreen)
                         }
                 )
-                // 横滑=调进度（约每 10pt = 1 秒）；单独播放时竖滑=画面跟手并露出相邻封面，松手切换
+                // 横滑=调进度（约每 10pt = 1 秒）；单独播放时竖滑=整页列表式滚动，松手吸附过半页决定切换
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 25)
                         .onChanged { value in
@@ -51,7 +51,8 @@ struct PlayerView: View {
                                 let canMove = (ty < 0 && model.adjacent(1) != nil)
                                     || (ty > 0 && model.adjacent(-1) != nil)
                                 if canMove {
-                                    dragOffset = rubberBand(ty)
+                                    // 1:1 跟手（无橡皮筋），最多滚一整页，像列表滚动
+                                    dragOffset = min(max(ty, -geo.size.height), geo.size.height)
                                 }
                             } else if tx >= abs(ty) {
                                 flashTimeline()
@@ -60,11 +61,18 @@ struct PlayerView: View {
                         .onEnded { value in
                             let dx = value.translation.width
                             let dy = value.translation.height
-                            withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
                             if !model.listLoop && abs(dy) > abs(dx) {
-                                // 松手时才判定：过阈值切换下一条/上一条，否则弹回
-                                if dy < -100 { model.next() } else if dy > 100 { model.previous() }
+                                // 松手时按"过半页"决定吸附到哪条，并把该页吸到屏幕中心
+                                let H = geo.size.height
+                                if dragOffset < -H / 2 {
+                                    snapAndSwitch(to: -H, forward: true)
+                                } else if dragOffset > H / 2 {
+                                    snapAndSwitch(to: H, forward: false)
+                                } else {
+                                    withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
+                                }
                             } else {
+                                withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
                                 model.seekRelative(dx / 10.0)
                                 flashTimeline()
                             }
@@ -115,24 +123,14 @@ struct PlayerView: View {
         }
         .edgesIgnoringSafeArea(.all)
         .onDisappear { model.stop() }
+        // 新视频就绪：视频页立即接替居中的封面页（两者首屏内容一致，交接无感）
+        .onChange(of: model.loadedIndex) { _ in dragOffset = 0 }
     }
 
-    // MARK: - 竖滑橡皮筋阻尼：前 60% 行程跟手 1:1，接近上限时阻力渐增
-
-    /// 竖滑画面位移/相邻封面露出的上限（pt）
-    private let peekMax: CGFloat = 300
-
-    private func rubberBand(_ t: CGFloat) -> CGFloat {
-        let soft: CGFloat = peekMax * 0.6
-        let hard: CGFloat = peekMax
-        let a = abs(t)
-        let o: CGFloat
-        if a <= soft {
-            o = a
-        } else {
-            o = soft + (hard - soft) * (1 - exp(-(a - soft) / (hard - soft)))
-        }
-        return t > 0 ? o : -o
+    /// 松手吸附：整页滑到屏幕中心并开始切换加载
+    private func snapAndSwitch(to page: CGFloat, forward: Bool) {
+        withAnimation(.easeOut(duration: 0.25)) { dragOffset = page }
+        if forward { model.next() } else { model.previous() }
     }
 
     // MARK: - 全屏下滑动时临时显示时间轴，2 秒后自动隐藏

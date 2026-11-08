@@ -10,6 +10,8 @@ final class PlayerModel: ObservableObject {
     @Published var failed = false
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
+    /// 已完成加载并开始播放的条目下标（单独播放竖滑切换时，视图据此把封面页换成视频页）
+    @Published var loadedIndex = 0
     /// 用户拖动进度条时暂停观察器覆盖 currentTime
     var isScrubbing = false
 
@@ -284,6 +286,7 @@ final class PlayerModel: ObservableObject {
                 self.looper = AVPlayerLooper(player: self.queue, templateItem: item)
                 self.queue.play()
                 self.isPlaying = true
+                self.loadedIndex = self.index   // 通知视图：新视频就绪，可由封面页交还视频页
             }
         }
     }
