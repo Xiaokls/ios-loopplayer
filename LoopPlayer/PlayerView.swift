@@ -11,6 +11,7 @@ struct PlayerView: View {
     @State private var hideTimelineTask: DispatchWorkItem?
     /// 竖滑跟手时画面的纵向位移（已乘阻尼系数）
     @State private var dragOffset: CGFloat = 0
+    @State private var isDragging = false
     /// 全屏状态变化回调（宿主控制器据此淡化 Home 小白条）
     var onFullscreenChanged: ((Bool) -> Void)? = nil
     /// 返回按钮回调（宿主控制器直接 dismiss，比 presentationMode 更可靠）
@@ -44,6 +45,7 @@ struct PlayerView: View {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 25)
                         .onChanged { value in
+                            isDragging = true
                             let tx = abs(value.translation.width)
                             let ty = value.translation.height
                             if !model.listLoop && abs(ty) > tx {
@@ -59,6 +61,7 @@ struct PlayerView: View {
                             }
                         }
                         .onEnded { value in
+                            isDragging = false
                             let dx = value.translation.width
                             let dy = value.translation.height
                             if !model.listLoop && abs(dy) > abs(dx) {
@@ -85,18 +88,20 @@ struct PlayerView: View {
                 // 上滑露出下一页的顶部，下滑露出上一页的底部（与真实翻页一致）。
                 // 拖动中把相邻页向画面吸最多 20pt，盖掉视频信箱黑条（30pt→10pt 观感），松手恢复
                 if dragOffset < -1, let next = model.adjacent(1) {
-                    let pull = min(CGFloat(20), -dragOffset)
+                    let H = geo.size.height
+                    let pull = min(CGFloat(20), -dragOffset, H + dragOffset)
                     ThumbView(asset: next)
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width, height: H)
                         .clipped()
-                        .position(x: geo.size.width / 2, y: geo.size.height * 1.5 + dragOffset - pull)
+                        .position(x: geo.size.width / 2, y: H * 1.5 + dragOffset - pull)
                 }
                 if dragOffset > 1, let prev = model.adjacent(-1) {
-                    let pull = min(CGFloat(20), dragOffset)
+                    let H = geo.size.height
+                    let pull = min(CGFloat(20), dragOffset, H - dragOffset)
                     ThumbView(asset: prev)
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width, height: H)
                         .clipped()
-                        .position(x: geo.size.width / 2, y: dragOffset - geo.size.height / 2 + pull)
+                        .position(x: geo.size.width / 2, y: dragOffset - H / 2 + pull)
                 }
 
                 if !fullscreen {
@@ -128,8 +133,14 @@ struct PlayerView: View {
         }
         .edgesIgnoringSafeArea(.all)
         .onDisappear { model.stop() }
-        // 新视频就绪：视频页立即接替居中的封面页（两者首屏内容一致，交接无感）
-        .onChange(of: model.loadedIndex) { _ in dragOffset = 0 }
+        // 新视频就绪后不立即交接：等吸附动画（0.32s）把当前页完全滑出屏幕，
+        // 下一页封面居中，再由视频页无感接替（封面≈视频首帧）
+        .onChange(of: model.loadedIndex) { _ in
+            guard abs(dragOffset) > 1 else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.34) {
+                if !isDragging, abs(dragOffset) > 1 { dragOffset = 0 }
+            }
+        }
     }
 
     /// 松手吸附：整页滑到屏幕中心并开始切换加载
