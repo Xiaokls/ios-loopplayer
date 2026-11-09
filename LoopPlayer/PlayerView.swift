@@ -1,4 +1,5 @@
 import AVFoundation
+import Photos
 import SwiftUI
 
 /// 播放页：头部 < 返回；单击屏幕暂停/播放；双指放大全屏、缩小退出全屏
@@ -53,18 +54,8 @@ struct PlayerView: View {
                                 let canMove = (ty < 0 && model.adjacent(1) != nil)
                                     || (ty > 0 && model.adjacent(-1) != nil)
                                 if canMove {
-                                    // 前段 1:1 跟手；接近整页的最后 30pt 行程加阻尼，
-                                    // 相邻页滑到贴近屏幕上下边缘时明显变沉，不直冲圆弧边
-                                    let H = geo.size.height
-                                    let softEnd = H - 30
-                                    let a = abs(ty)
-                                    let d: CGFloat
-                                    if a <= softEnd {
-                                        d = a
-                                    } else {
-                                        d = softEnd + (a - softEnd) * 0.35
-                                    }
-                                    dragOffset = (ty > 0 ? 1 : -1) * min(d, H)
+                                    // 1:1 跟手（无橡皮筋），最多滚一整页，像列表滚动
+                                    dragOffset = min(max(ty, -geo.size.height), geo.size.height)
                                 }
                             } else if tx >= abs(ty) {
                                 flashTimeline()
@@ -94,20 +85,24 @@ struct PlayerView: View {
                         }
                 )
 
-                // 相邻条目按整屏页面尺寸紧贴当前页上下缘：
-                // 上滑露出下一页的顶部，下滑露出上一页的底部（与真实翻页一致）
+                // 相邻条目按整屏页面尺寸紧贴当前页上下缘（封面以视频信箱方式显示，上下自带黑边）：
+                // 吸附最后 30pt 行程吸边量减速归零，next 居中时黑边已就位，交接无顶边无闪帧
                 if dragOffset < -1, let next = model.adjacent(1) {
                     let H = geo.size.height
-                    let pull = adjacentPull(depth: -dragOffset, bar: letterboxBar(geo), pageH: H)
-                    ThumbView(asset: next)
+                    let pull = adjacentPull(depth: -dragOffset,
+                                            curBar: letterboxBar(geo, model.currentAsset),
+                                            nextBar: letterboxBar(geo, next), pageH: H)
+                    ThumbView(asset: next, fit: true)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
                         .position(x: geo.size.width / 2, y: H * 1.5 + dragOffset - pull)
                 }
                 if dragOffset > 1, let prev = model.adjacent(-1) {
                     let H = geo.size.height
-                    let pull = adjacentPull(depth: dragOffset, bar: letterboxBar(geo), pageH: H)
-                    ThumbView(asset: prev)
+                    let pull = adjacentPull(depth: dragOffset,
+                                            curBar: letterboxBar(geo, model.currentAsset),
+                                            nextBar: letterboxBar(geo, prev), pageH: H)
+                    ThumbView(asset: prev, fit: true)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
                         .position(x: geo.size.width / 2, y: dragOffset - H / 2 + pull)
@@ -152,23 +147,25 @@ struct PlayerView: View {
         }
     }
 
-    /// 当前视频窗口模式的信箱黑条高度（按真实宽高比计算；全屏为裁切显示，无黑条）
-    private func letterboxBar(_ geo: GeometryProxy) -> CGFloat {
+    /// 指定资源在窗口模式下的信箱黑条高度（按真实宽高比计算；全屏为裁切显示，无黑条）
+    private func letterboxBar(_ geo: GeometryProxy, _ asset: PHAsset?) -> CGFloat {
         if fullscreen { return 0 }
-        guard let a = model.currentAsset, a.pixelHeight > 0 else { return 0 }
+        guard let a = asset, a.pixelHeight > 0 else { return 0 }
         let ar = CGFloat(a.pixelWidth) / CGFloat(a.pixelHeight)
         guard ar > 0 else { return 0 }
         let displayH = min(geo.size.height, geo.size.width / ar)
         return max(0, (geo.size.height - displayH) / 2)
     }
 
-    /// 相邻页吸边量：拖动全程与画面保持 10pt 间距；
-    /// 接近整页吸附时平滑过渡到恰好等于黑条高度——next 居中时底边即视频画面底边，
-    /// 黑边已预留，交接视频时无位移、无闪帧
-    private func adjacentPull(depth: CGFloat, bar: CGFloat, pageH: CGFloat) -> CGFloat {
-        guard bar > 10 else { return 0 }
-        let t = min(max(depth / max(pageH, 1), 0), 1)
-        return min(max(bar - 10 + 10 * t, 0), bar)
+    /// 相邻页吸边量：拖动全程与当前画面保持 10pt 间距；
+    /// 接近整页的最后 30pt 行程线性减速到 0——相邻页触到屏幕边缘前就慢下来，
+    /// 居中时其信箱黑边恰好就位（与视频画面同位置同尺寸），交接零位移、不顶圆弧边
+    private func adjacentPull(depth: CGFloat, curBar: CGFloat, nextBar: CGFloat, pageH: CGFloat) -> CGFloat {
+        let base = max(0, curBar + nextBar - 10)
+        let zone: CGFloat = 30
+        let remain = pageH - depth
+        if remain >= zone { return base }
+        return base * max(0, remain) / zone
     }
 
     /// 松手吸附：整页滑到屏幕中心并开始切换加载

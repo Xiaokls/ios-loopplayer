@@ -93,18 +93,19 @@ enum PhotoLib {
     }
 }
 
-/// 相册/视频缩略图视图
+/// 相册/视频缩略图视图。fit=true 时按视频信箱方式显示（等比完整+上下黑边），用于播放页相邻页
 struct ThumbView: View {
     let asset: PHAsset?
+    var fit: Bool = false
     @State private var image: UIImage?
 
     var body: some View {
         ZStack {
-            Color(white: 0.15)
+            fit ? Color.black : Color(white: 0.15)
             if let img = image {
                 Image(uiImage: img)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: fit ? .fit : .fill)
             }
         }
         .onAppear { load() }
