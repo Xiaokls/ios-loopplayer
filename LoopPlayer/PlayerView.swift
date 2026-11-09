@@ -13,6 +13,9 @@ struct PlayerView: View {
     /// 竖滑跟手时画面的纵向位移（已乘阻尼系数）
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging = false
+    /// 本次拖拽锁定的方向：竖滑翻页 / 横滑快进（起手后不互换，避免中途跳模式）
+    private enum DragMode { case none, page, seek }
+    @State private var dragMode: DragMode = .none
     /// 全屏状态变化回调（宿主控制器据此淡化 Home 小白条）
     var onFullscreenChanged: ((Bool) -> Void)? = nil
     /// 返回按钮回调（宿主控制器直接 dismiss，比 presentationMode 更可靠）
@@ -42,14 +45,27 @@ struct PlayerView: View {
                             onFullscreenChanged?(fullscreen)
                         }
                 )
-                // 横滑=调进度（约每 10pt = 1 秒）；单独播放时竖滑=整页列表式滚动，松手吸附过半页决定切换
+                // 横滑=快进预览（暂停+压暗+停顿显关键帧，松手恢复）；
+                // 单独播放时竖滑=整页列表式滚动，松手吸附过半页决定切换
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 25)
                         .onChanged { value in
                             isDragging = true
                             let tx = abs(value.translation.width)
                             let ty = value.translation.height
-                            if !model.listLoop && abs(ty) > tx {
+                            if dragMode == .none {
+                                if !model.listLoop && abs(ty) > tx {
+                                    dragMode = .page
+                                } else if tx >= abs(ty) {
+                                    dragMode = .seek
+                                    model.beginSeekPreview()
+                                }
+                            }
+                            switch dragMode {
+                            case .seek:
+                                flashTimeline()
+                                model.updateSeekPreview(deltaSeconds: value.translation.width / 10.0)
+                            case .page:
                                 // 该方向有相邻条目才允许拖动；首/尾条对应方向画面锁死不动
                                 let canMove = (ty < 0 && model.adjacent(1) != nil)
                                     || (ty > 0 && model.adjacent(-1) != nil)
@@ -57,15 +73,18 @@ struct PlayerView: View {
                                     // 1:1 跟手（无橡皮筋），最多滚一整页，像列表滚动
                                     dragOffset = min(max(ty, -geo.size.height), geo.size.height)
                                 }
-                            } else if tx >= abs(ty) {
-                                flashTimeline()
+                            case .none:
+                                break
                             }
                         }
                         .onEnded { value in
                             isDragging = false
-                            let dx = value.translation.width
-                            let dy = value.translation.height
-                            if !model.listLoop && abs(dy) > abs(dx) {
+                            let mode = dragMode
+                            dragMode = .none
+                            switch mode {
+                            case .seek:
+                                model.endSeekPreview()
+                            case .page:
                                 let H = geo.size.height
                                 // 模拟原生滚动：用系统预测的惯性落点判定翻页，
                                 // 轻快一扫即使位移不大也能翻页；慢拖仍需过半页。
@@ -79,10 +98,8 @@ struct PlayerView: View {
                                 } else {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { dragOffset = 0 }
                                 }
-                            } else {
-                                withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
-                                model.seekRelative(dx / 10.0)
-                                flashTimeline()
+                            case .none:
+                                break
                             }
                         }
                 )
@@ -108,6 +125,12 @@ struct PlayerView: View {
                         .frame(width: geo.size.width, height: H)
                         .clipped()
                         .position(x: geo.size.width / 2, y: dragOffset - H / 2 + pull)
+                }
+
+                // 横滑快进预览期间：画面压暗 40%
+                if model.isSeeking {
+                    Color.black.opacity(0.4)
+                        .allowsHitTesting(false)
                 }
 
                 if !fullscreen {

@@ -164,16 +164,77 @@ final class PlayerModel: ObservableObject {
         currentTime = clamped
     }
 
-    /// 相对当前进度快进/快退（左右滑动用）
-    func seekRelative(_ delta: Double) {
-        seek(to: currentTime + delta)
-    }
-
     /// 上滑切换下一条（仅单独播放模式）
     func next() { switchRelative(1) }
 
     /// 下滑切换上一条（仅单独播放模式）
     func previous() { switchRelative(-1) }
+
+    // MARK: - 横滑快进预览：滑动暂停画面，停顿显示关键帧，松手恢复播放；进度圆圈实时跟随
+
+    @Published var isSeeking = false
+    private var seekWasPlaying = false
+    private var seekStart: Double = 0
+    private var seekTarget: Double = 0
+    private var seekPreviewTask: DispatchWorkItem?
+
+    /// 起手横滑：暂停播放并冻结时间轴显示（视图据 isSeeking 叠暗色遮罩）
+    func beginSeekPreview() {
+        guard !isSeeking, !stopped else { return }
+        isSeeking = true
+        isScrubbing = true
+        seekWasPlaying = isPlaying
+        seekStart = sliderValue
+        seekTarget = seekStart
+        queue.pause()
+        isPlaying = false
+    }
+
+    /// 滑动位移换算目标秒：圆圈立即跟随；手指停顿 150ms 后精确 seek 显示该位置关键帧
+    func updateSeekPreview(deltaSeconds: Double) {
+        guard isSeeking else { return }
+        let (lo, hi) = seekBounds()
+        seekTarget = min(max(seekStart + deltaSeconds, lo), hi)
+        setSlider(seekTarget)
+        seekPreviewTask?.cancel()
+        let task = DispatchWorkItem { [weak self] in self?.showPreviewFrame() }
+        seekPreviewTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: task)
+    }
+
+    /// 松手：提交最终位置，恢复滑动前的播放状态
+    func endSeekPreview() {
+        guard isSeeking else { return }
+        seekPreviewTask?.cancel()
+        isSeeking = false
+        isScrubbing = false
+        let local = localTime(of: seekTarget)
+        queue.seek(to: CMTime(seconds: local, preferredTimescale: 600),
+                   toleranceBefore: .zero, toleranceAfter: .zero)
+        currentTime = local
+        if seekWasPlaying {
+            queue.play()
+            isPlaying = true
+        }
+    }
+
+    /// 快进范围限制在当前条目内（连播模式按全局秒换算）
+    private func seekBounds() -> (Double, Double) {
+        let base = (listLoop && currentAssetIdx < segStart.count) ? segStart[currentAssetIdx] : 0
+        return (base, base + max(duration - 0.3, 0))
+    }
+
+    private func localTime(of global: Double) -> Double {
+        let base = (listLoop && currentAssetIdx < segStart.count) ? segStart[currentAssetIdx] : 0
+        return global - base
+    }
+
+    private func showPreviewFrame() {
+        guard isSeeking else { return }
+        let local = localTime(of: seekTarget)
+        queue.seek(to: CMTime(seconds: local, preferredTimescale: 600),
+                   toleranceBefore: .zero, toleranceAfter: .zero)
+    }
 
     private func switchRelative(_ delta: Int) {
         guard !listLoop, !stopped, assets.count > 1 else { return }
