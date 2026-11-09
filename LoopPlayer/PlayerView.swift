@@ -85,11 +85,10 @@ struct PlayerView: View {
                 )
 
                 // 相邻条目按整屏页面尺寸紧贴当前页上下缘：
-                // 上滑露出下一页的顶部，下滑露出上一页的底部（与真实翻页一致）。
-                // 拖动中把相邻页向画面吸 25pt（30pt 信箱黑条恒定只露 5pt 间距），松手恢复
+                // 上滑露出下一页的顶部，下滑露出上一页的底部（与真实翻页一致）
                 if dragOffset < -1, let next = model.adjacent(1) {
                     let H = geo.size.height
-                    let pull = min(CGFloat(25), -dragOffset)
+                    let pull = adjacentPull(depth: -dragOffset, bar: letterboxBar(geo), pageH: H)
                     ThumbView(asset: next)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
@@ -97,7 +96,7 @@ struct PlayerView: View {
                 }
                 if dragOffset > 1, let prev = model.adjacent(-1) {
                     let H = geo.size.height
-                    let pull = min(CGFloat(25), dragOffset)
+                    let pull = adjacentPull(depth: dragOffset, bar: letterboxBar(geo), pageH: H)
                     ThumbView(asset: prev)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
@@ -141,6 +140,25 @@ struct PlayerView: View {
                 if !isDragging, abs(dragOffset) > 1 { dragOffset = 0 }
             }
         }
+    }
+
+    /// 当前视频窗口模式的信箱黑条高度（按真实宽高比计算；全屏为裁切显示，无黑条）
+    private func letterboxBar(_ geo: GeometryProxy) -> CGFloat {
+        if fullscreen { return 0 }
+        guard let a = model.currentAsset, a.pixelHeight > 0 else { return 0 }
+        let ar = CGFloat(a.pixelWidth) / CGFloat(a.pixelHeight)
+        guard ar > 0 else { return 0 }
+        let displayH = min(geo.size.height, geo.size.width / ar)
+        return max(0, (geo.size.height - displayH) / 2)
+    }
+
+    /// 相邻页吸边量：拖动全程与画面保持 5pt 间距；
+    /// 接近整页吸附时平滑过渡到恰好等于黑条高度——next 居中时底边即视频画面底边，
+    /// 黑边已预留，交接视频时无位移、无闪帧
+    private func adjacentPull(depth: CGFloat, bar: CGFloat, pageH: CGFloat) -> CGFloat {
+        guard bar > 0 else { return 0 }
+        let t = min(max(depth / max(pageH, 1), 0), 1)
+        return min(max(bar - 5 + 5 * t, 0), bar)
     }
 
     /// 松手吸附：整页滑到屏幕中心并开始切换加载

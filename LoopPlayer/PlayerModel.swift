@@ -191,6 +191,11 @@ final class PlayerModel: ObservableObject {
         return assets[i]
     }
 
+    /// 当前播放条目（视图据此计算信箱黑条高度）
+    var currentAsset: PHAsset? {
+        assets.indices.contains(index) ? assets[index] : nil
+    }
+
     func togglePlay() {
         if isPlaying {
             queue.pause()
