@@ -97,14 +97,14 @@ struct PlayerView: View {
                                 model.endSeekPreview()
                             case .page:
                                 let H = geo.size.height
-                                // 模拟原生滚动：用系统预测的惯性落点判定翻页，
-                                // 轻快一扫即使位移不大也能翻页；慢拖仍需过半页。
+                                // 翻页判定阈值：实际位移或惯性预测落点超过 260pt 即翻页
+                                let flip: CGFloat = 260
                                 // 且该方向必须真有相邻条目才允许吸附+切换——
                                 // 否则首/尾条被拦截的方向仍会吸附出屏，造成黑屏且索引错位
                                 let p = value.predictedEndTranslation.height
-                                if (dragOffset < -H / 2 || p < -H / 2), model.adjacent(1) != nil {
+                                if (dragOffset < -flip || p < -flip), model.adjacent(1) != nil {
                                     snapAndSwitch(to: -H, forward: true)
-                                } else if (dragOffset > H / 2 || p > H / 2), model.adjacent(-1) != nil {
+                                } else if (dragOffset > flip || p > flip), model.adjacent(-1) != nil {
                                     snapAndSwitch(to: H, forward: false)
                                 } else {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) { dragOffset = 0 }
