@@ -97,8 +97,8 @@ struct PlayerView: View {
                                 model.endSeekPreview()
                             case .page:
                                 let H = geo.size.height
-                                // 翻页判定阈值：实际位移或惯性预测落点超过 260pt 即翻页
-                                let flip: CGFloat = 260
+                                // 翻页判定阈值：实际位移或惯性预测落点超过 200pt 即翻页
+                                let flip: CGFloat = 200
                                 // 且该方向必须真有相邻条目才允许吸附+切换——
                                 // 否则首/尾条被拦截的方向仍会吸附出屏，造成黑屏且索引错位
                                 let p = value.predictedEndTranslation.height
