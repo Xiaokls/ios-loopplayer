@@ -94,7 +94,7 @@ struct PlayerView: View {
                     let pull = adjacentPull(depth: -dragOffset,
                                             curBar: letterboxBar(geo, model.currentAsset),
                                             nextBar: letterboxBar(geo, next), pageH: H)
-                    ThumbView(asset: next, fit: true)
+                    ThumbView(asset: next, fit: !fullscreen)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
                         .position(x: geo.size.width / 2, y: H * 1.5 + dragOffset - pull)
@@ -104,7 +104,7 @@ struct PlayerView: View {
                     let pull = adjacentPull(depth: dragOffset,
                                             curBar: letterboxBar(geo, model.currentAsset),
                                             nextBar: letterboxBar(geo, prev), pageH: H)
-                    ThumbView(asset: prev, fit: true)
+                    ThumbView(asset: prev, fit: !fullscreen)
                         .frame(width: geo.size.width, height: H)
                         .clipped()
                         .position(x: geo.size.width / 2, y: dragOffset - H / 2 + pull)
@@ -159,10 +159,11 @@ struct PlayerView: View {
         return max(0, (geo.size.height - displayH) / 2)
     }
 
-    /// 相邻页吸边量：拖动全程与当前画面保持 10pt 间距；
-    /// 接近整页的最后 30pt 行程线性减速到 0——相邻页触到屏幕边缘前就慢下来，
-    /// 居中时其信箱黑边恰好就位（与视频画面同位置同尺寸），交接零位移、不顶圆弧边
+    /// 相邻页吸边量：窗口模式拖动全程与当前画面保持 10pt 间距，
+    /// 接近整页的最后 30pt 行程线性减速到 0（居中时信箱黑边就位，交接无闪帧）；
+    /// 全屏为裁切显示无黑边，只留 1pt 细缝
     private func adjacentPull(depth: CGFloat, curBar: CGFloat, nextBar: CGFloat, pageH: CGFloat) -> CGFloat {
+        if fullscreen { return -1 }
         let base = max(0, curBar + nextBar - 10)
         let zone: CGFloat = 30
         let remain = pageH - depth
