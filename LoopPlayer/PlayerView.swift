@@ -53,8 +53,18 @@ struct PlayerView: View {
                                 let canMove = (ty < 0 && model.adjacent(1) != nil)
                                     || (ty > 0 && model.adjacent(-1) != nil)
                                 if canMove {
-                                    // 1:1 跟手（无橡皮筋），最多滚一整页，像列表滚动
-                                    dragOffset = min(max(ty, -geo.size.height), geo.size.height)
+                                    // 前段 1:1 跟手；接近整页的最后 30pt 行程加阻尼，
+                                    // 相邻页滑到贴近屏幕上下边缘时明显变沉，不直冲圆弧边
+                                    let H = geo.size.height
+                                    let softEnd = H - 30
+                                    let a = abs(ty)
+                                    let d: CGFloat
+                                    if a <= softEnd {
+                                        d = a
+                                    } else {
+                                        d = softEnd + (a - softEnd) * 0.35
+                                    }
+                                    dragOffset = (ty > 0 ? 1 : -1) * min(d, H)
                                 }
                             } else if tx >= abs(ty) {
                                 flashTimeline()
@@ -152,13 +162,13 @@ struct PlayerView: View {
         return max(0, (geo.size.height - displayH) / 2)
     }
 
-    /// 相邻页吸边量：拖动全程与画面保持 5pt 间距；
+    /// 相邻页吸边量：拖动全程与画面保持 10pt 间距；
     /// 接近整页吸附时平滑过渡到恰好等于黑条高度——next 居中时底边即视频画面底边，
     /// 黑边已预留，交接视频时无位移、无闪帧
     private func adjacentPull(depth: CGFloat, bar: CGFloat, pageH: CGFloat) -> CGFloat {
-        guard bar > 0 else { return 0 }
+        guard bar > 10 else { return 0 }
         let t = min(max(depth / max(pageH, 1), 0), 1)
-        return min(max(bar - 5 + 5 * t, 0), bar)
+        return min(max(bar - 10 + 10 * t, 0), bar)
     }
 
     /// 松手吸附：整页滑到屏幕中心并开始切换加载
