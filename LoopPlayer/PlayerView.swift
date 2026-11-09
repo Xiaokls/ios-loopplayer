@@ -16,6 +16,9 @@ struct PlayerView: View {
     /// 本次拖拽锁定的方向：竖滑翻页 / 横滑快进（起手后不互换，避免中途跳模式）
     private enum DragMode { case none, page, seek }
     @State private var dragMode: DragMode = .none
+    /// 横滑快进的累计位移（按纵向偏移变速缩放后累加，避免偏斜时数值回跳）
+    @State private var seekAccum: CGFloat = 0
+    @State private var seekLastTx: CGFloat = 0
     /// 全屏状态变化回调（宿主控制器据此淡化 Home 小白条）
     var onFullscreenChanged: ((Bool) -> Void)? = nil
     /// 返回按钮回调（宿主控制器直接 dismiss，比 presentationMode 更可靠）
@@ -58,13 +61,21 @@ struct PlayerView: View {
                                     dragMode = .page
                                 } else if tx >= abs(ty) {
                                     dragMode = .seek
+                                    seekAccum = 0
+                                    seekLastTx = value.translation.width
                                     model.beginSeekPreview()
                                 }
                             }
                             switch dragMode {
                             case .seek:
                                 flashTimeline()
-                                model.updateSeekPreview(deltaSeconds: value.translation.width / 10.0)
+                                // 手指偏向上下时按偏移量降低快进速率（最低 25%），
+                                // 回到起点 Y 轴速率恢复；数值只累加不回卷
+                                let dx = value.translation.width - seekLastTx
+                                seekLastTx = value.translation.width
+                                let decay = max(0.25, 1 - abs(ty) / 300)
+                                seekAccum += dx * decay
+                                model.updateSeekPreview(deltaSeconds: seekAccum / 10.0)
                             case .page:
                                 // 该方向有相邻条目才允许拖动；首/尾条对应方向画面锁死不动
                                 let canMove = (ty < 0 && model.adjacent(1) != nil)
